@@ -40,7 +40,7 @@ resource "google_network_connectivity_hub" "hub" {
 
 resource "google_network_connectivity_spoke" "spoke1" {
   name     = "spoke1"
-  location = "us-central1"
+  location = "global"
   hub      = google_network_connectivity_hub.hub.id
   linked_vpc_network {
     uri = google_compute_network.vpc1.self_link
@@ -49,7 +49,7 @@ resource "google_network_connectivity_spoke" "spoke1" {
 
 resource "google_network_connectivity_spoke" "spoke2" {
   name     = "spoke2"
-  location = "us-central1"
+  location = "global"
   hub      = google_network_connectivity_hub.hub.id
   linked_vpc_network {
     uri = google_compute_network.vpc2.self_link
