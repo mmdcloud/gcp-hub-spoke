@@ -59,6 +59,7 @@ resource "google_network_connectivity_spoke" "spoke2" {
 resource "google_compute_instance" "instance1" {
   name         = "instance1"
   machine_type = "e2-micro"
+  zone         = "us-central1-a"
   network_interface {
     network    = google_compute_network.vpc1.id
     subnetwork = google_compute_subnetwork.vpc1-subnets[0].id
@@ -78,6 +79,7 @@ resource "google_compute_instance" "instance2" {
 
   name                    = "instance2"
   machine_type            = "e2-micro"
+  zone                    = "us-central1-a"
   metadata_startup_script = "sudo apt-get update; sudo apt-get install nginx"
   network_interface {
     network    = google_compute_network.vpc2.id
