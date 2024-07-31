@@ -23,7 +23,7 @@ resource "google_compute_network" "vpc2" {
 
 resource "google_compute_subnetwork" "vpc2-subnets" {
   count                    = 3
-  name                     = "vpc1-subnet${count.index + 1}"
+  name                     = "vpc2-subnet${count.index + 1}"
   ip_cidr_range            = var.ip_cidr_range2[count.index]
   region                   = var.region
   network                  = google_compute_network.vpc2.id
