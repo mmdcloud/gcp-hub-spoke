@@ -94,3 +94,27 @@ resource "google_compute_instance" "instance2" {
   deletion_protection       = false
   allow_stopping_for_update = true
 }
+
+resource "google_compute_firewall" "vpc1_firewall" {
+  name    = "vpc1-firewall"
+  network = google_compute_network.vpc1.id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+}
+
+resource "google_compute_firewall" "vpc2_firewall" {
+  name    = "vpc2-firewall"
+  network = google_compute_network.vpc2.id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+}
