@@ -71,7 +71,7 @@ resource "google_compute_instance" "instance1" {
       nat_ip = google_compute_address.instance1_ip.address
     }
   }
-  metadata_startup_script = "sudo apt-get update; sudo apt-get install nginx"
+  metadata_startup_script = "sudo apt-get update; sudo apt-get install nginx -y"
 
   boot_disk {
     initialize_params {
@@ -92,7 +92,7 @@ resource "google_compute_instance" "instance2" {
   name                    = "instance2"
   machine_type            = "e2-micro"
   zone                    = "us-central1-a"
-  metadata_startup_script = "sudo apt-get update; sudo apt-get install nginx"
+  metadata_startup_script = "sudo apt-get update; sudo apt-get install nginx -y"
   network_interface {
     network    = google_compute_network.vpc2.id
     subnetwork = google_compute_subnetwork.vpc2-subnets[0].id
