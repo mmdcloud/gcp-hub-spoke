@@ -78,7 +78,7 @@ resource "google_compute_instance" "instance1" {
       image = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
     }
   }
-  
+
   deletion_protection       = false
   allow_stopping_for_update = true
 }
@@ -106,7 +106,7 @@ resource "google_compute_instance" "instance2" {
       image = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
     }
   }
-  
+
   deletion_protection       = false
   allow_stopping_for_update = true
 }
@@ -116,8 +116,19 @@ resource "google_compute_firewall" "vpc1_firewall" {
   network = google_compute_network.vpc1.id
 
   allow {
-    protocol = "tcp"
-    ports    = ["80", "22"]
+    protocol = "icmp"
+  }
+
+  source_ranges = [google_compute_instance.instance2.network_interface[0].network_ip]
+}
+
+resource "google_compute_firewall" "vpc1_firewall_ssh" {
+  name    = "vpc1-firewall-ssh"
+  network = google_compute_network.vpc1.id
+
+  allow {
+    protocol = "ssh"
+    ports    = ["22"]
   }
 
   source_ranges = ["0.0.0.0/0"]
@@ -128,8 +139,19 @@ resource "google_compute_firewall" "vpc2_firewall" {
   network = google_compute_network.vpc2.id
 
   allow {
-    protocol = "tcp"
-    ports    = ["80", "22"]
+    protocol = "icmp"
+  }
+
+  source_ranges = [google_compute_instance.instance1.network_interface[0].network_ip]
+}
+
+resource "google_compute_firewall" "vpc2_firewall_ssh" {
+  name    = "vpc2-firewall-ssh"
+  network = google_compute_network.vpc2.id
+
+  allow {
+    protocol = "ssh"
+    ports    = ["22"]
   }
 
   source_ranges = ["0.0.0.0/0"]

@@ -10,5 +10,5 @@ terraform {
 # Configure the Google Provider
 provider "google" {
   project = "our-mediator-443812-i8"
-  region = "us-central1"
+  region  = "us-central1"
 }
