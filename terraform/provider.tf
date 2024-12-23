@@ -9,6 +9,6 @@ terraform {
 
 # Configure the Google Provider
 provider "google" {
-  project = "our-mediator-443812-i8"
+  project = "nodal-talon-445602-m1"
   region  = "us-central1"
 }

@@ -127,7 +127,7 @@ resource "google_compute_firewall" "vpc1_firewall_ssh" {
   network = google_compute_network.vpc1.id
 
   allow {
-    protocol = "ssh"
+    protocol = "tcp"
     ports    = ["22"]
   }
 
@@ -150,7 +150,7 @@ resource "google_compute_firewall" "vpc2_firewall_ssh" {
   network = google_compute_network.vpc2.id
 
   allow {
-    protocol = "ssh"
+    protocol = "tcp"
     ports    = ["22"]
   }
 
