@@ -1,7 +1,7 @@
 # VPC1 
 module "vpc1" {
   source                          = "./modules/vpc"
-  vpc_name                        = "vpc1"
+  vpc_name                        = "connectivity-vpc1"
   delete_default_routes_on_create = false
   auto_create_subnetworks         = false
   routing_mode                    = "REGIONAL"
@@ -10,7 +10,7 @@ module "vpc1" {
   private_ip_google_access        = false
   firewall_data = [
     {
-      name          = "vpc1-firewall"
+      name          = "connectivity-vpc1-firewall"
       source_ranges = [module.instance2.network_ip]
       allow_list = [
         {
@@ -20,7 +20,7 @@ module "vpc1" {
       ]
     },
     {
-      name          = "vpc1-firewall-ssh"
+      name          = "connectivity-vpc1-firewall-ssh"
       source_ranges = ["0.0.0.0/0"]
       allow_list = [
         {
@@ -35,7 +35,7 @@ module "vpc1" {
 # VPC2 
 module "vpc2" {
   source                          = "./modules/vpc"
-  vpc_name                        = "vpc2"
+  vpc_name                        = "connectivity-vpc2"
   delete_default_routes_on_create = false
   auto_create_subnetworks         = false
   routing_mode                    = "REGIONAL"
@@ -44,7 +44,7 @@ module "vpc2" {
   private_ip_google_access        = false
   firewall_data = [
     {
-      name          = "vpc2-firewall"
+      name          = "connectivity-vpc2-firewall"
       source_ranges = [module.instance1.network_ip]
       allow_list = [
         {
@@ -54,7 +54,7 @@ module "vpc2" {
       ]
     },
     {
-      name          = "vpc2-firewall-ssh"
+      name          = "connectivity-vpc2-firewall-ssh"
       source_ranges = ["0.0.0.0/0"]
       allow_list = [
         {
@@ -91,7 +91,7 @@ resource "google_compute_address" "instance1_ip" {
 # Instance 1
 module "instance1" {
   source                    = "./modules/compute"
-  name                      = "instance1"
+  name                      = "connectivity-instance1"
   machine_type              = "e2-micro"
   zone                      = "us-central1-a"
   metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
@@ -118,7 +118,7 @@ resource "google_compute_address" "instance2_ip" {
 # Instance 2
 module "instance2" {
   source                    = "./modules/compute"
-  name                      = "instance2"
+  name                      = "connectivity-instance2"
   machine_type              = "e2-micro"
   zone                      = "us-central1-a"
   metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
