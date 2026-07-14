@@ -3,6 +3,11 @@ variable "region" {
   default = "us-central1"
 }
 
+variable "project_id" {
+  type    = string
+  default = "encoded-alpha-457108-e8"
+}
+
 variable "ip_cidr_range1" {
   type        = list(string)
   description = "List of The range of internal addresses that are owned by this subnetwork."

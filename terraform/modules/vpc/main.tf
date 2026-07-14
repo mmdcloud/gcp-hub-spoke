@@ -6,12 +6,14 @@ resource "google_compute_network" "vpc" {
 }
 
 resource "google_compute_subnetwork" "subnets" {
-  count                    = length(var.ip_cidr_ranges)
-  name                     = "${var.vpc_name}-subnet-${count.index + 1}"
-  ip_cidr_range            = var.ip_cidr_ranges[count.index]
-  region                   = var.region
+  count                    = length(var.subnets)
+  name                     = var.subnets[count.index].name
+  ip_cidr_range            = var.subnets[count.index].ip_cidr_range
+  region                   = var.subnets[count.index].region
   network                  = google_compute_network.vpc.id
-  private_ip_google_access = var.private_ip_google_access
+  private_ip_google_access = var.subnets[count.index].private_ip_google_access
+  purpose                  = var.subnets[count.index].purpose
+  role                     = var.subnets[count.index].role
 }
 
 resource "google_compute_firewall" "firewall" {
@@ -25,6 +27,6 @@ resource "google_compute_firewall" "firewall" {
       ports    = allow.value["ports"]
     }
   }
-
+  target_tags = var.firewall_data[count.index].target_tags
   source_ranges = var.firewall_data[count.index].source_ranges
 }
