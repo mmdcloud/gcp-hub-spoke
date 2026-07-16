@@ -1,6 +1,7 @@
 resource "google_network_connectivity_hub" "hub" {
   name        = var.hub_name
   description = var.hub_description
+  export_psc = var.export_psc
   labels = {
     name = var.hub_name
   }

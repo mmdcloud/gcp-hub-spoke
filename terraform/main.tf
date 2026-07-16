@@ -1,15 +1,8 @@
-#---------------------------------------------------------------
-# Data Sources
-#---------------------------------------------------------------
-data "http" "local_ip" {
-  url = "https://ifconfig.me"
-}
-
-locals {
-  local_ip = data.http.local_ip.response_body
-}
-
 data "google_project" "project" {}
+
+resource "random_id" "vpn_shared_secret" {
+  byte_length = 16
+}
 
 #---------------------------------------------------------------
 # VPC1 (hub-spoke)
@@ -32,17 +25,6 @@ module "vpc1" {
   ]
   firewall_data = [
     {
-      name          = "vpc1-firewall-ssh"
-      target_tags   = ["vpc1-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["22"]
-        }
-      ]
-    },
-    {
       name          = "connectivity-vpc1-firewall"
       source_ranges = [module.instance2.network_ip]
       target_tags   = ["vpc1-instance"]
@@ -54,27 +36,16 @@ module "vpc1" {
       ]
     },
     {
-      name          = "consumer-instance-firewall"
-      source_ranges = [module.consumer_instance.network_ip]
+      name          = "consumer-instance-vpc1-firewall"
+      source_ranges = [google_compute_address.psc_consumer_ip.address]
       target_tags   = ["vpc1-instance"]
-      allow_list = [
-        {
-          protocol = "icmp"
-          ports    = []
-        }
-      ]
-    },
-    {
-      name          = "vpc1-firewall-http"
-      target_tags   = ["vpc1-instance"]
-      source_ranges = ["0.0.0.0/0"]
       allow_list = [
         {
           protocol = "tcp"
           ports    = ["80"]
         }
       ]
-    }
+    }    
   ]
 }
 
@@ -97,18 +68,7 @@ module "vpc2" {
       ip_cidr_range            = "10.2.0.0/24"
     }
   ]
-  firewall_data = [
-    {
-      name          = "vpc2-firewall-ssh"
-      target_tags   = ["vpc2-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["22"]
-        }
-      ]
-    },
+  firewall_data = [    
     {
       name          = "connectivity-vpc2-firewall"
       source_ranges = [module.instance1.network_ip]
@@ -121,20 +81,9 @@ module "vpc2" {
       ]
     },
     {
-      name          = "consumer-instance-firewall"
-      source_ranges = [module.consumer_instance.network_ip]
+      name          = "consumer-instance-vpc2-firewall"
+      source_ranges = [google_compute_address.psc_consumer_ip.address]
       target_tags   = ["vpc2-instance"]
-      allow_list = [
-        {
-          protocol = "icmp"
-          ports    = []
-        }
-      ]
-    },
-    {
-      name          = "vpc2-firewall-http"
-      target_tags   = ["vpc2-instance"]
-      source_ranges = ["0.0.0.0/0"]
       allow_list = [
         {
           protocol = "tcp"
@@ -164,29 +113,7 @@ module "consumer_vpc" {
       ip_cidr_range            = "10.3.0.0/24"
     }
   ]
-  firewall_data = [
-    {
-      name          = "consumer-vpc-firewall-ssh"
-      target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["22"]
-        }
-      ]
-    },
-    {
-      name          = "consumer-vpc-firewall-http"
-      target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["80"]
-        }
-      ]
-    },
+  firewall_data = [    
     {
       name          = "instance1-firewall"
       source_ranges = [module.instance1.network_ip]
@@ -257,6 +184,7 @@ module "hub-spoke" {
   source          = "./modules/hub-spoke"
   hub_name        = "hub"
   hub_description = "A sample hub"
+  export_psc = true
   spokes = [
     {
       spoke_name             = "spoke1"
@@ -272,6 +200,11 @@ module "hub-spoke" {
       spoke_name             = "spoke3-consumer"
       location               = "global"
       linked_vpc_network_uri = module.consumer_vpc.self_link
+    },
+    {
+      spoke_name             = "spoke4-consumer"
+      location               = "global"
+      linked_vpc_network_uri = module.vpn_consumer_vpc.self_link
     }
   ]
 }
@@ -505,4 +438,220 @@ module "consumer_instance" {
     }
   ]
   tags = ["consumer-instance"]
+}
+
+# --------------------------------------------------------------------------
+# VPC Configuration
+# --------------------------------------------------------------------------
+module "vpn_producer_vpc" {
+  source                          = "./modules/vpc"
+  vpc_name                        = "vpn-producer-vpc"
+  delete_default_routes_on_create = false
+  auto_create_subnetworks         = false
+  routing_mode                    = "REGIONAL"
+  subnets = [
+    {
+      name                     = "vpn-producer-subnet"
+      region                   = var.region
+      purpose                  = "PRIVATE"
+      role                     = "ACTIVE"
+      private_ip_google_access = true
+      ip_cidr_range            = "10.5.0.0/24"
+    }
+  ]
+  firewall_data = [    
+    # --- Added: allow the consumer subnet to reach the producer instance over the VPN ---
+    {
+      name          = "vpn-producer-vpc-allow-from-consumer-vpn"
+      target_tags   = ["vpn-producer-instance"]
+      source_ranges = ["10.6.0.0/24"]
+      allow_list = [
+        {
+          protocol = "icmp"
+        },
+        {
+          protocol = "tcp"
+          ports    = ["0-65535"]
+        },
+        {
+          protocol = "udp"
+          ports    = ["0-65535"]
+        }
+      ]
+    }
+  ]
+}
+
+module "vpn_consumer_vpc" {
+  source                          = "./modules/vpc"
+  vpc_name                        = "vpn-consumer-vpc"
+  delete_default_routes_on_create = false
+  auto_create_subnetworks         = false
+  routing_mode                    = "REGIONAL"
+  subnets = [
+    {
+      name                     = "vpn-consumer-subnet"
+      region                   = var.region
+      purpose                  = "PRIVATE"
+      role                     = "ACTIVE"
+      private_ip_google_access = true
+      ip_cidr_range            = "10.6.0.0/24"
+    }
+  ]
+  firewall_data = [    
+    # --- Added: allow the producer subnet to reach the consumer instance over the VPN ---
+    {
+      name          = "vpn-consumer-vpc-allow-from-producer-vpn"
+      target_tags   = ["vpn-consumer-instance"]
+      source_ranges = ["10.5.0.0/24"]
+      allow_list = [
+        {
+          protocol = "icmp"
+        },
+        {
+          protocol = "tcp"
+          ports    = ["0-65535"]
+        },
+        {
+          protocol = "udp"
+          ports    = ["0-65535"]
+        }
+      ]
+    }
+  ]
+}
+
+# --------------------------------------------------------------------------
+# VPN Configuration
+# --------------------------------------------------------------------------
+resource "google_compute_ha_vpn_gateway" "producer_gateway" {
+  # FIXED: was `region = vpc.producer_region` (invalid reference)
+  region     = var.region
+  name       = "producer-vpn-gw"
+  network    = module.producer_vpc.vpc_id
+  stack_type = "IPV4_ONLY"
+}
+
+resource "google_compute_ha_vpn_gateway" "consumer_gateway" {
+  # FIXED: was `region = vpc.consumer_region` (invalid reference)
+  region     = var.region
+  name       = "consumer-vpn-gw"
+  network    = module.consumer_vpc.vpc_id
+  stack_type = "IPV4_ONLY"
+}
+
+# --- Cloud Routers (needed for dynamic/BGP routing over HA VPN) ---
+resource "google_compute_router" "producer_router" {
+  name    = "producer-router"
+  region  = var.region
+  network = module.producer_vpc.vpc_id
+  bgp {
+    asn = 65001
+  }
+}
+
+resource "google_compute_router" "consumer_router" {
+  name    = "consumer-router"
+  region  = var.region
+  network = module.consumer_vpc.vpc_id
+  bgp {
+    asn = 65002
+  }
+}
+
+# --- VPN Tunnels (single interface pair; see note below for full HA) ---
+resource "google_compute_vpn_tunnel" "producer_to_consumer" {
+  name                  = "producer-to-consumer-tunnel"
+  region                = var.region
+  vpn_gateway           = google_compute_ha_vpn_gateway.producer_gateway.id
+  peer_gcp_gateway      = google_compute_ha_vpn_gateway.consumer_gateway.id
+  shared_secret         = random_id.vpn_shared_secret.hex
+  router                = google_compute_router.producer_router.id
+  vpn_gateway_interface = 0
+}
+
+resource "google_compute_vpn_tunnel" "consumer_to_producer" {
+  name                  = "consumer-to-producer-tunnel"
+  region                = var.region
+  vpn_gateway           = google_compute_ha_vpn_gateway.consumer_gateway.id
+  peer_gcp_gateway      = google_compute_ha_vpn_gateway.producer_gateway.id
+  shared_secret         = random_id.vpn_shared_secret.hex
+  router                = google_compute_router.consumer_router.id
+  vpn_gateway_interface = 0
+}
+
+# --- Router interfaces + BGP peers (this is what actually exchanges routes) ---
+resource "google_compute_router_interface" "producer_interface" {
+  name       = "producer-router-if"
+  router     = google_compute_router.producer_router.name
+  region     = var.region
+  ip_range   = "169.254.0.1/30"
+  vpn_tunnel = google_compute_vpn_tunnel.producer_to_consumer.name
+}
+
+resource "google_compute_router_peer" "producer_peer" {
+  name            = "producer-router-peer"
+  router          = google_compute_router.producer_router.name
+  region          = var.region
+  peer_ip_address = "169.254.0.2"
+  peer_asn        = 65002
+  interface       = google_compute_router_interface.producer_interface.name
+}
+
+resource "google_compute_router_interface" "consumer_interface" {
+  name       = "consumer-router-if"
+  router     = google_compute_router.consumer_router.name
+  region     = var.region
+  ip_range   = "169.254.0.2/30"
+  vpn_tunnel = google_compute_vpn_tunnel.consumer_to_producer.name
+}
+
+resource "google_compute_router_peer" "consumer_peer" {
+  name            = "consumer-router-peer"
+  router          = google_compute_router.consumer_router.name
+  region          = var.region
+  peer_ip_address = "169.254.0.1"
+  peer_asn        = 65001
+  interface       = google_compute_router_interface.consumer_interface.name
+}
+
+# --------------------------------------------------------------------------
+# Compute Instances
+# --------------------------------------------------------------------------
+module "vpn_producer_instance" {
+  source                    = "./modules/compute"
+  name                      = "vpn-producer-instance"
+  machine_type              = "e2-micro"
+  zone                      = "${var.region}-a"
+  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  deletion_protection       = false
+  allow_stopping_for_update = true
+  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  network_interfaces = [
+    {
+      network        = "${module.vpn_producer_vpc.vpc_id}"
+      subnetwork     = "${module.vpn_producer_vpc.subnets[0].id}"
+      access_configs = []
+    }
+  ]
+  tags = ["vpn-producer-instance"]
+}
+
+module "vpn_consumer_instance" {
+  source                    = "./modules/compute"
+  name                      = "vpn-consumer-instance"
+  machine_type              = "e2-micro"
+  zone                      = "${var.region}-a"
+  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  deletion_protection       = false
+  allow_stopping_for_update = true
+  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  network_interfaces = [
+    {
+      network        = "${module.vpn_consumer_vpc.vpc_id}"
+      subnetwork     = "${module.vpn_consumer_vpc.subnets[0].id}"
+      access_configs = []
+    }
+  ]
+  tags = ["vpn-consumer-instance"]
 }
