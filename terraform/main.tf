@@ -45,8 +45,35 @@ module "vpc1" {
           ports    = ["80"]
         }
       ]
-    }    
+    }
   ]
+}
+
+resource "google_compute_address" "instance1_ip" {
+  name = "instance1-address"
+}
+
+module "instance1" {
+  source                    = "./modules/compute"
+  name                      = "connectivity-instance1"
+  machine_type              = "e2-micro"
+  zone                      = "${var.region}-a"
+  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  deletion_protection       = false
+  allow_stopping_for_update = true
+  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  network_interfaces = [
+    {
+      network    = module.vpc1.vpc_id
+      subnetwork = module.vpc1.subnets[0].id
+      access_configs = [
+        {
+          nat_ip = google_compute_address.instance1_ip.address
+        }
+      ]
+    }
+  ]
+  tags = ["vpc1-instance"]
 }
 
 #---------------------------------------------------------------
@@ -68,7 +95,7 @@ module "vpc2" {
       ip_cidr_range            = "10.2.0.0/24"
     }
   ]
-  firewall_data = [    
+  firewall_data = [
     {
       name          = "connectivity-vpc2-firewall"
       source_ranges = [module.instance1.network_ip]
@@ -94,8 +121,35 @@ module "vpc2" {
   ]
 }
 
+resource "google_compute_address" "instance2_ip" {
+  name = "instance2-address"
+}
+
+module "instance2" {
+  source                    = "./modules/compute"
+  name                      = "connectivity-instance2"
+  machine_type              = "e2-micro"
+  zone                      = "${var.region}-a"
+  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  deletion_protection       = false
+  allow_stopping_for_update = true
+  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  network_interfaces = [
+    {
+      network    = module.vpc2.vpc_id
+      subnetwork = module.vpc2.subnets[0].id
+      access_configs = [
+        {
+          nat_ip = google_compute_address.instance2_ip.address
+        }
+      ]
+    }
+  ]
+  tags = ["vpc2-instance"]
+}
+
 #---------------------------------------------------------------
-# Consumer VPC (Private Service Connect)
+# Private Service Connect Configuration
 #---------------------------------------------------------------
 module "consumer_vpc" {
   source                          = "./modules/vpc"
@@ -113,7 +167,7 @@ module "consumer_vpc" {
       ip_cidr_range            = "10.3.0.0/24"
     }
   ]
-  firewall_data = [    
+  firewall_data = [
     {
       name          = "instance1-firewall"
       source_ranges = [module.instance1.network_ip]
@@ -139,9 +193,6 @@ module "consumer_vpc" {
   ]
 }
 
-#---------------------------------------------------------------
-# Producer VPC (Private Service Connect)
-#---------------------------------------------------------------
 module "producer_vpc" {
   source                          = "./modules/vpc"
   vpc_name                        = "producer-vpc"
@@ -177,101 +228,6 @@ module "producer_vpc" {
   firewall_data = []
 }
 
-#---------------------------------------------------------------
-# Hub-Spoke: all four VPCs attached as spokes to the same hub
-#---------------------------------------------------------------
-module "hub-spoke" {
-  source          = "./modules/hub-spoke"
-  hub_name        = "hub"
-  hub_description = "A sample hub"
-  export_psc = true
-  spokes = [
-    {
-      spoke_name             = "spoke1"
-      location               = "global"
-      linked_vpc_network_uri = module.vpc1.self_link
-    },
-    {
-      spoke_name             = "spoke2"
-      location               = "global"
-      linked_vpc_network_uri = module.vpc2.self_link
-    },
-    {
-      spoke_name             = "spoke3-consumer"
-      location               = "global"
-      linked_vpc_network_uri = module.consumer_vpc.self_link
-    },
-    {
-      spoke_name             = "spoke4-consumer"
-      location               = "global"
-      linked_vpc_network_uri = module.vpn_consumer_vpc.self_link
-    }
-  ]
-}
-
-#---------------------------------------------------------------
-# Instance 1 (VPC1)
-#---------------------------------------------------------------
-resource "google_compute_address" "instance1_ip" {
-  name = "instance1-address"
-}
-
-module "instance1" {
-  source                    = "./modules/compute"
-  name                      = "connectivity-instance1"
-  machine_type              = "e2-micro"
-  zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
-  deletion_protection       = false
-  allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
-  network_interfaces = [
-    {
-      network    = module.vpc1.vpc_id
-      subnetwork = module.vpc1.subnets[0].id
-      access_configs = [
-        {
-          nat_ip = google_compute_address.instance1_ip.address
-        }
-      ]
-    }
-  ]
-  tags = ["vpc1-instance"]
-}
-
-#---------------------------------------------------------------
-# Instance 2 (VPC2)
-#---------------------------------------------------------------
-resource "google_compute_address" "instance2_ip" {
-  name = "instance2-address"
-}
-
-module "instance2" {
-  source                    = "./modules/compute"
-  name                      = "connectivity-instance2"
-  machine_type              = "e2-micro"
-  zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
-  deletion_protection       = false
-  allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
-  network_interfaces = [
-    {
-      network    = module.vpc2.vpc_id
-      subnetwork = module.vpc2.subnets[0].id
-      access_configs = [
-        {
-          nat_ip = google_compute_address.instance2_ip.address
-        }
-      ]
-    }
-  ]
-  tags = ["vpc2-instance"]
-}
-
-#---------------------------------------------------------------
-# Artifact Registry
-#---------------------------------------------------------------
 module "artifact_registry" {
   source        = "./modules/artifact-registry"
   location      = var.region
@@ -280,9 +236,6 @@ module "artifact_registry" {
   shell_command = "bash ${path.cwd}/../src/artifact_push.sh ${data.google_project.project.project_id}"
 }
 
-#---------------------------------------------------------------
-# Cloud Run Service
-#---------------------------------------------------------------
 module "cloud_run_service_account" {
   source        = "./modules/service-account"
   account_id    = "cloud-run-sa"
@@ -332,9 +285,6 @@ resource "google_cloud_run_service_iam_member" "cloud_run_access" {
   member   = "allUsers"
 }
 
-#---------------------------------------------------------------
-# Load Balancer Configuration
-#---------------------------------------------------------------
 module "service_neg" {
   source       = "./modules/network_endpoint_groups"
   neg_name     = "service-neg"
@@ -377,9 +327,6 @@ resource "google_compute_forwarding_rule" "default" {
   ip_protocol           = "TCP"
 }
 
-#---------------------------------------------------------------
-# Private Service Connect Configuration
-#---------------------------------------------------------------
 resource "google_compute_service_attachment" "psc_attachment" {
   name                  = "psc-attachment"
   region                = var.region
@@ -391,9 +338,6 @@ resource "google_compute_service_attachment" "psc_attachment" {
   target_service        = google_compute_forwarding_rule.default.id
 }
 
-#---------------------------------------------------------------
-# Consumer Instance Configuration
-#---------------------------------------------------------------
 resource "google_compute_address" "psc_consumer_ip" {
   project      = var.project_id
   name         = "psc-consumer-ip"
@@ -441,7 +385,7 @@ module "consumer_instance" {
 }
 
 # --------------------------------------------------------------------------
-# VPC Configuration
+# VPN Configuration
 # --------------------------------------------------------------------------
 module "vpn_producer_vpc" {
   source                          = "./modules/vpc"
@@ -459,8 +403,7 @@ module "vpn_producer_vpc" {
       ip_cidr_range            = "10.5.0.0/24"
     }
   ]
-  firewall_data = [    
-    # --- Added: allow the consumer subnet to reach the producer instance over the VPN ---
+  firewall_data = [
     {
       name          = "vpn-producer-vpc-allow-from-consumer-vpn"
       target_tags   = ["vpn-producer-instance"]
@@ -498,8 +441,7 @@ module "vpn_consumer_vpc" {
       ip_cidr_range            = "10.6.0.0/24"
     }
   ]
-  firewall_data = [    
-    # --- Added: allow the producer subnet to reach the consumer instance over the VPN ---
+  firewall_data = [
     {
       name          = "vpn-consumer-vpc-allow-from-producer-vpn"
       target_tags   = ["vpn-consumer-instance"]
@@ -521,9 +463,6 @@ module "vpn_consumer_vpc" {
   ]
 }
 
-# --------------------------------------------------------------------------
-# VPN Configuration
-# --------------------------------------------------------------------------
 resource "google_compute_ha_vpn_gateway" "producer_gateway" {
   # FIXED: was `region = vpc.producer_region` (invalid reference)
   region     = var.region
@@ -615,28 +554,6 @@ resource "google_compute_router_peer" "consumer_peer" {
   interface       = google_compute_router_interface.consumer_interface.name
 }
 
-# --------------------------------------------------------------------------
-# Compute Instances
-# --------------------------------------------------------------------------
-module "vpn_producer_instance" {
-  source                    = "./modules/compute"
-  name                      = "vpn-producer-instance"
-  machine_type              = "e2-micro"
-  zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
-  deletion_protection       = false
-  allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
-  network_interfaces = [
-    {
-      network        = "${module.vpn_producer_vpc.vpc_id}"
-      subnetwork     = "${module.vpn_producer_vpc.subnets[0].id}"
-      access_configs = []
-    }
-  ]
-  tags = ["vpn-producer-instance"]
-}
-
 module "vpn_consumer_instance" {
   source                    = "./modules/compute"
   name                      = "vpn-consumer-instance"
@@ -654,4 +571,36 @@ module "vpn_consumer_instance" {
     }
   ]
   tags = ["vpn-consumer-instance"]
+}
+
+#---------------------------------------------------------------
+# Hub-Spoke: all four VPCs attached as spokes to the same hub
+#---------------------------------------------------------------
+module "hub-spoke" {
+  source          = "./modules/hub-spoke"
+  hub_name        = "hub"
+  hub_description = "A sample hub"
+  export_psc      = true
+  spokes = [
+    {
+      spoke_name             = "spoke1"
+      location               = "global"
+      linked_vpc_network_uri = module.vpc1.self_link
+    },
+    {
+      spoke_name             = "spoke2"
+      location               = "global"
+      linked_vpc_network_uri = module.vpc2.self_link
+    },
+    {
+      spoke_name             = "spoke3-consumer"
+      location               = "global"
+      linked_vpc_network_uri = module.consumer_vpc.self_link
+    },
+    {
+      spoke_name             = "spoke4-consumer"
+      location               = "global"
+      linked_vpc_network_uri = module.vpn_consumer_vpc.self_link
+    }
+  ]
 }
