@@ -25,7 +25,18 @@ module "vpc1" {
   ]
   firewall_data = [
     {
-      name          = "connectivity-vpc1-firewall"
+      name          = "vpc1-instance1-ssh"
+      source_ranges = ["0.0.0.0/0"]
+      target_tags   = ["vpc1-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["22"]
+        }
+      ]
+    },
+    {
+      name          = "vpc1-instance2-firewall"
       source_ranges = [module.instance2.network_ip]
       target_tags   = ["vpc1-instance"]
       allow_list = [
@@ -36,13 +47,35 @@ module "vpc1" {
       ]
     },
     {
-      name          = "consumer-instance-vpc1-firewall"
+      name          = "vpc1-psc-instance-ping"
+      source_ranges = [module.consumer_instance.network_ip]
+      target_tags   = ["vpc1-instance"]
+      allow_list = [
+        {
+          protocol = "icmp",
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "psc-vpc1-firewall"
       source_ranges = [google_compute_address.psc_consumer_ip.address]
       target_tags   = ["vpc1-instance"]
       allow_list = [
         {
           protocol = "tcp"
           ports    = ["80"]
+        }
+      ]
+    },
+    {
+      name          = "vpc1-vpn-allow"
+      target_tags   = ["vpc1-instance"]
+      source_ranges = [module.vpn_consumer_instance.network_ip]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
         }
       ]
     }
@@ -66,11 +99,7 @@ module "instance1" {
     {
       network    = module.vpc1.vpc_id
       subnetwork = module.vpc1.subnets[0].id
-      access_configs = [
-        {
-          nat_ip = google_compute_address.instance1_ip.address
-        }
-      ]
+      access_configs = []
     }
   ]
   tags = ["vpc1-instance"]
@@ -97,7 +126,18 @@ module "vpc2" {
   ]
   firewall_data = [
     {
-      name          = "connectivity-vpc2-firewall"
+      name          = "vpc2-instance2-ssh"
+      source_ranges = ["0.0.0.0/0"]
+      target_tags   = ["vpc2-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["22"]
+        }
+      ]
+    },
+    {
+      name          = "vpc2-instance1-firewall"
       source_ranges = [module.instance1.network_ip]
       target_tags   = ["vpc2-instance"]
       allow_list = [
@@ -108,13 +148,35 @@ module "vpc2" {
       ]
     },
     {
-      name          = "consumer-instance-vpc2-firewall"
+      name          = "vpc2-psc-instance-ping"
+      source_ranges = [module.consumer_instance.network_ip]
+      target_tags   = ["vpc2-instance"]
+      allow_list = [
+        {
+          protocol = "icmp",
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "psc-vpc2-firewall"
       source_ranges = [google_compute_address.psc_consumer_ip.address]
       target_tags   = ["vpc2-instance"]
       allow_list = [
         {
           protocol = "tcp"
           ports    = ["80"]
+        }
+      ]
+    },
+    {
+      name          = "vpc2-vpn-allow"
+      target_tags   = ["vpc2-instance"]
+      source_ranges = [module.vpn_consumer_instance.network_ip]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
         }
       ]
     }
@@ -138,11 +200,7 @@ module "instance2" {
     {
       network    = module.vpc2.vpc_id
       subnetwork = module.vpc2.subnets[0].id
-      access_configs = [
-        {
-          nat_ip = google_compute_address.instance2_ip.address
-        }
-      ]
+      access_configs = []
     }
   ]
   tags = ["vpc2-instance"]
@@ -169,9 +227,20 @@ module "consumer_vpc" {
   ]
   firewall_data = [
     {
-      name          = "instance1-firewall"
+      name          = "psc-consumer-ssh"
+      source_ranges = ["0.0.0.0/0"]
+      target_tags   = ["psc-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["22"]
+        }
+      ]
+    },
+    {
+      name          = "psc-instance1-firewall"
       source_ranges = [module.instance1.network_ip]
-      target_tags   = ["consumer-instance"]
+      target_tags   = ["psc-instance"]
       allow_list = [
         {
           protocol = "icmp"
@@ -180,9 +249,31 @@ module "consumer_vpc" {
       ]
     },
     {
-      name          = "instance2-firewall"
+      name          = "psc-instance2-firewall"
       source_ranges = [module.instance2.network_ip]
-      target_tags   = ["consumer-instance"]
+      target_tags   = ["psc-instance"]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "psc-consumer-instance-firewall"
+      source_ranges = [google_compute_address.psc_consumer_ip.address]
+      target_tags   = ["psc-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["80"]
+        }
+      ]
+    },
+    {
+      name          = "psc-vpn-allow"
+      target_tags   = ["psc-instance"]
+      source_ranges = [module.vpn_consumer_instance.network_ip]
       allow_list = [
         {
           protocol = "icmp"
@@ -357,13 +448,9 @@ resource "google_compute_forwarding_rule" "psc_consumer_forwarding_rule" {
   network               = module.consumer_vpc.vpc_id
 }
 
-resource "google_compute_address" "consumer_instance_address" {
-  name = "consumer-instance-address"
-}
-
 module "consumer_instance" {
   source                    = "./modules/compute"
-  name                      = "consumer-instance"
+  name                      = "psc-instance"
   machine_type              = "e2-micro"
   zone                      = "${var.region}-a"
   metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
@@ -374,14 +461,10 @@ module "consumer_instance" {
     {
       network    = "${module.consumer_vpc.vpc_id}"
       subnetwork = "${module.consumer_vpc.subnets[0].id}"
-      access_configs = [
-        {
-          nat_ip = "${google_compute_address.consumer_instance_address.address}"
-        }
-      ]
+      access_configs = []
     }
   ]
-  tags = ["consumer-instance"]
+  tags = ["psc-instance"]
 }
 
 # --------------------------------------------------------------------------
@@ -411,14 +494,7 @@ module "vpn_producer_vpc" {
       allow_list = [
         {
           protocol = "icmp"
-        },
-        {
-          protocol = "tcp"
-          ports    = ["0-65535"]
-        },
-        {
-          protocol = "udp"
-          ports    = ["0-65535"]
+          ports    = []
         }
       ]
     }
@@ -443,20 +519,68 @@ module "vpn_consumer_vpc" {
   ]
   firewall_data = [
     {
+      name          = "vpn-consumer-ssh"
+      source_ranges = ["0.0.0.0/0"]
+      target_tags   = ["vpn-consumer-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["22"]
+        }
+      ]
+    },
+    {
+      name          = "vpn-instance1-firewall"
+      source_ranges = [module.instance1.network_ip]
+      target_tags   = ["vpn-consumer-instance"]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "vpn-instance2-firewall"
+      source_ranges = [module.instance2.network_ip]
+      target_tags   = ["vpn-consumer-instance"]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "consumer-instance-vpn-firewall"
+      source_ranges = [google_compute_address.psc_consumer_ip.address]
+      target_tags   = ["vpn-consumer-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["80"]
+        }
+      ]
+    },
+    {
+      name          = "vpn-psc-firewall"
+      source_ranges = [module.psc_instance.network_ip]
+      target_tags   = ["psc-instance"]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
+        }
+      ]
+    },
+    {
       name          = "vpn-consumer-vpc-allow-from-producer-vpn"
       target_tags   = ["vpn-consumer-instance"]
       source_ranges = ["10.5.0.0/24"]
       allow_list = [
         {
           protocol = "icmp"
-        },
-        {
-          protocol = "tcp"
-          ports    = ["0-65535"]
-        },
-        {
-          protocol = "udp"
-          ports    = ["0-65535"]
+          ports    = []
         }
       ]
     }
@@ -467,7 +591,7 @@ resource "google_compute_ha_vpn_gateway" "producer_gateway" {
   # FIXED: was `region = vpc.producer_region` (invalid reference)
   region     = var.region
   name       = "producer-vpn-gw"
-  network    = module.producer_vpc.vpc_id
+  network    = module.vpn_producer_vpc.vpc_id
   stack_type = "IPV4_ONLY"
 }
 
@@ -475,7 +599,7 @@ resource "google_compute_ha_vpn_gateway" "consumer_gateway" {
   # FIXED: was `region = vpc.consumer_region` (invalid reference)
   region     = var.region
   name       = "consumer-vpn-gw"
-  network    = module.consumer_vpc.vpc_id
+  network    = module.vpn_consumer_vpc.vpc_id
   stack_type = "IPV4_ONLY"
 }
 
@@ -483,7 +607,7 @@ resource "google_compute_ha_vpn_gateway" "consumer_gateway" {
 resource "google_compute_router" "producer_router" {
   name    = "producer-router"
   region  = var.region
-  network = module.producer_vpc.vpc_id
+  network = module.vpn_producer_vpc.vpc_id
   bgp {
     asn = 65001
   }
@@ -492,7 +616,7 @@ resource "google_compute_router" "producer_router" {
 resource "google_compute_router" "consumer_router" {
   name    = "consumer-router"
   region  = var.region
-  network = module.consumer_vpc.vpc_id
+  network = module.vpn_consumer_vpc.vpc_id
   bgp {
     asn = 65002
   }

@@ -27,6 +27,7 @@ resource "google_compute_firewall" "firewall" {
       ports    = allow.value["ports"]
     }
   }
+  source_tags = var.firewall_data[count.index].source_tags
   target_tags = var.firewall_data[count.index].target_tags
   source_ranges = var.firewall_data[count.index].source_ranges
 }
