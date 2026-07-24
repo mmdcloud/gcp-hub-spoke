@@ -20,7 +20,7 @@ module "vpc1" {
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.1.0.0/24"
+      ip_cidr_range            = var.vpc1_subnet_cidr
     }
   ]
   firewall_data = [
@@ -52,7 +52,7 @@ module "vpc1" {
       target_tags   = ["vpc1-instance"]
       allow_list = [
         {
-          protocol = "icmp",
+          protocol = "icmp"
           ports    = []
         }
       ]
@@ -89,12 +89,12 @@ resource "google_compute_address" "instance1_ip" {
 module "instance1" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance1"
-  machine_type              = "e2-micro"
+  machine_type              = var.machine_type
   zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  image                     = var.instance_image
   network_interfaces = [
     {
       network    = module.vpc1.vpc_id
@@ -121,7 +121,7 @@ module "vpc2" {
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.2.0.0/24"
+      ip_cidr_range            = var.vpc2_subnet_cidr
     }
   ]
   firewall_data = [
@@ -153,7 +153,7 @@ module "vpc2" {
       target_tags   = ["vpc2-instance"]
       allow_list = [
         {
-          protocol = "icmp",
+          protocol = "icmp"
           ports    = []
         }
       ]
@@ -190,12 +190,12 @@ resource "google_compute_address" "instance2_ip" {
 module "instance2" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance2"
-  machine_type              = "e2-micro"
+  machine_type              = var.machine_type
   zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  image                     = var.instance_image
   network_interfaces = [
     {
       network    = module.vpc2.vpc_id
@@ -222,7 +222,7 @@ module "consumer_vpc" {
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.3.0.0/24"
+      ip_cidr_range            = var.consumer_subnet_cidr
     }
   ]
   firewall_data = [
@@ -297,7 +297,7 @@ module "producer_vpc" {
       purpose                  = "PRIVATE"
       private_ip_google_access = true
       role                     = "ACTIVE"
-      ip_cidr_range            = "10.4.0.0/24"
+      ip_cidr_range            = var.producer_subnet_cidr
     },
     {
       name                     = "psc-subnet"
@@ -305,7 +305,7 @@ module "producer_vpc" {
       purpose                  = "PRIVATE_SERVICE_CONNECT"
       private_ip_google_access = true
       role                     = "ACTIVE"
-      ip_cidr_range            = "10.20.0.0/24"
+      ip_cidr_range            = var.producer_psc_subnet_cidr
     },
     {
       name                     = "proxy-only-subnet"
@@ -313,7 +313,7 @@ module "producer_vpc" {
       purpose                  = "REGIONAL_MANAGED_PROXY"
       private_ip_google_access = false
       role                     = "ACTIVE"
-      ip_cidr_range            = "10.129.0.0/23"
+      ip_cidr_range            = var.producer_proxy_subnet_cidr
     }
   ]
   firewall_data = []
@@ -323,7 +323,7 @@ module "artifact_registry" {
   source        = "./modules/artifact-registry"
   location      = var.region
   description   = "nodeapp code repository"
-  repository_id = "nodeapp"
+  repository_id = var.artifact_repository_id
   shell_command = "bash ${path.cwd}/../src/artifact_push.sh ${data.google_project.project.project_id}"
 }
 
@@ -344,10 +344,10 @@ module "cloud_run_service" {
   ingress                          = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   service_account                  = module.cloud_run_service_account.sa_email
   location                         = var.region
-  min_instance_count               = 2
-  max_instance_count               = 5
-  max_instance_request_concurrency = 80
-  name                             = "nodeapp"
+  min_instance_count               = var.cloud_run_min_instances
+  max_instance_count               = var.cloud_run_max_instances
+  max_instance_request_concurrency = var.cloud_run_concurrency
+  name                              = var.cloud_run_service_name
   volumes                          = []
   traffic = [
     {
@@ -357,12 +357,12 @@ module "cloud_run_service" {
   ]
   containers = [
     {
-      port              = 8080
+      port              = var.cloud_run_container_port
       env               = []
       volume_mounts     = []
       cpu_idle          = true
       startup_cpu_boost = true
-      image             = "${var.region}-docker.pkg.dev/${data.google_project.project.project_id}/nodeapp/nodeapp:latest"
+      image             = "${var.region}-docker.pkg.dev/${data.google_project.project.project_id}/${var.artifact_repository_id}/${var.cloud_run_service_name}:latest"
     }
   ]
   depends_on = [module.artifact_registry]
@@ -451,12 +451,12 @@ resource "google_compute_forwarding_rule" "psc_consumer_forwarding_rule" {
 module "consumer_instance" {
   source                    = "./modules/compute"
   name                      = "psc-instance"
-  machine_type              = "e2-micro"
+  machine_type              = var.machine_type
   zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  image                     = var.instance_image
   network_interfaces = [
     {
       network    = "${module.consumer_vpc.vpc_id}"
@@ -483,14 +483,14 @@ module "vpn_producer_vpc" {
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.5.0.0/24"
+      ip_cidr_range            = var.vpn_producer_subnet_cidr
     }
   ]
   firewall_data = [
     {
       name          = "vpn-producer-vpc-allow-from-consumer-vpn"
       target_tags   = ["vpn-producer-instance"]
-      source_ranges = ["10.6.0.0/24"]
+      source_ranges = [var.vpn_consumer_subnet_cidr]
       allow_list = [
         {
           protocol = "icmp"
@@ -514,7 +514,7 @@ module "vpn_consumer_vpc" {
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.6.0.0/24"
+      ip_cidr_range            = var.vpn_consumer_subnet_cidr
     }
   ]
   firewall_data = [
@@ -576,7 +576,7 @@ module "vpn_consumer_vpc" {
     {
       name          = "vpn-consumer-vpc-allow-from-producer-vpn"
       target_tags   = ["vpn-consumer-instance"]
-      source_ranges = ["10.5.0.0/24"]
+      source_ranges = [var.vpn_producer_subnet_cidr]
       allow_list = [
         {
           protocol = "icmp"
@@ -609,7 +609,7 @@ resource "google_compute_router" "producer_router" {
   region  = var.region
   network = module.vpn_producer_vpc.vpc_id
   bgp {
-    asn = 65001
+    asn = var.producer_bgp_asn
   }
 }
 
@@ -618,7 +618,7 @@ resource "google_compute_router" "consumer_router" {
   region  = var.region
   network = module.vpn_consumer_vpc.vpc_id
   bgp {
-    asn = 65002
+    asn = var.consumer_bgp_asn
   }
 }
 
@@ -648,7 +648,7 @@ resource "google_compute_router_interface" "producer_interface" {
   name       = "producer-router-if"
   router     = google_compute_router.producer_router.name
   region     = var.region
-  ip_range   = "169.254.0.1/30"
+  ip_range   = var.producer_router_interface_ip_range
   vpn_tunnel = google_compute_vpn_tunnel.producer_to_consumer.name
 }
 
@@ -656,8 +656,8 @@ resource "google_compute_router_peer" "producer_peer" {
   name            = "producer-router-peer"
   router          = google_compute_router.producer_router.name
   region          = var.region
-  peer_ip_address = "169.254.0.2"
-  peer_asn        = 65002
+  peer_ip_address = var.producer_peer_ip_address
+  peer_asn        = var.consumer_bgp_asn
   interface       = google_compute_router_interface.producer_interface.name
 }
 
@@ -665,7 +665,7 @@ resource "google_compute_router_interface" "consumer_interface" {
   name       = "consumer-router-if"
   router     = google_compute_router.consumer_router.name
   region     = var.region
-  ip_range   = "169.254.0.2/30"
+  ip_range   = var.consumer_router_interface_ip_range
   vpn_tunnel = google_compute_vpn_tunnel.consumer_to_producer.name
 }
 
@@ -673,20 +673,20 @@ resource "google_compute_router_peer" "consumer_peer" {
   name            = "consumer-router-peer"
   router          = google_compute_router.consumer_router.name
   region          = var.region
-  peer_ip_address = "169.254.0.1"
-  peer_asn        = 65001
+  peer_ip_address = var.consumer_peer_ip_address
+  peer_asn        = var.producer_bgp_asn
   interface       = google_compute_router_interface.consumer_interface.name
 }
 
 module "vpn_consumer_instance" {
   source                    = "./modules/compute"
   name                      = "vpn-consumer-instance"
-  machine_type              = "e2-micro"
+  machine_type              = var.machine_type
   zone                      = "${var.region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
+  metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  image                     = var.instance_image
   network_interfaces = [
     {
       network        = "${module.vpn_consumer_vpc.vpc_id}"
@@ -702,8 +702,8 @@ module "vpn_consumer_instance" {
 #---------------------------------------------------------------
 module "hub-spoke" {
   source          = "./modules/hub-spoke"
-  hub_name        = "hub"
-  hub_description = "A sample hub"
+  hub_name        = var.hub_name
+  hub_description = var.hub_description
   export_psc      = true
   spokes = [
     {
