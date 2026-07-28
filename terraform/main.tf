@@ -97,8 +97,8 @@ module "instance1" {
   image                     = var.instance_image
   network_interfaces = [
     {
-      network    = module.vpc1.vpc_id
-      subnetwork = module.vpc1.subnets[0].id
+      network        = module.vpc1.vpc_id
+      subnetwork     = module.vpc1.subnets[0].id
       access_configs = []
     }
   ]
@@ -198,8 +198,8 @@ module "instance2" {
   image                     = var.instance_image
   network_interfaces = [
     {
-      network    = module.vpc2.vpc_id
-      subnetwork = module.vpc2.subnets[0].id
+      network        = module.vpc2.vpc_id
+      subnetwork     = module.vpc2.subnets[0].id
       access_configs = []
     }
   ]
@@ -347,7 +347,7 @@ module "cloud_run_service" {
   min_instance_count               = var.cloud_run_min_instances
   max_instance_count               = var.cloud_run_max_instances
   max_instance_request_concurrency = var.cloud_run_concurrency
-  name                              = var.cloud_run_service_name
+  name                             = var.cloud_run_service_name
   volumes                          = []
   traffic = [
     {
@@ -459,8 +459,8 @@ module "consumer_instance" {
   image                     = var.instance_image
   network_interfaces = [
     {
-      network    = "${module.consumer_vpc.vpc_id}"
-      subnetwork = "${module.consumer_vpc.subnets[0].id}"
+      network        = "${module.consumer_vpc.vpc_id}"
+      subnetwork     = "${module.consumer_vpc.subnets[0].id}"
       access_configs = []
     }
   ]
