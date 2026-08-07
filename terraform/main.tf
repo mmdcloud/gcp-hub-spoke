@@ -5,7 +5,7 @@ resource "random_id" "vpn_shared_secret" {
 }
 
 #---------------------------------------------------------------
-# VPC1 (hub-spoke)
+# VPC1
 #---------------------------------------------------------------
 module "vpc1" {
   source                          = "./modules/vpc"
@@ -26,7 +26,7 @@ module "vpc1" {
   firewall_data = [
     {
       name          = "vpc1-instance1-ssh"
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       target_tags   = ["vpc1-instance"]
       allow_list = [
         {
@@ -106,7 +106,7 @@ module "instance1" {
 }
 
 #---------------------------------------------------------------
-# VPC2 (hub-spoke)
+# VPC2
 #---------------------------------------------------------------
 module "vpc2" {
   source                          = "./modules/vpc"
@@ -127,7 +127,7 @@ module "vpc2" {
   firewall_data = [
     {
       name          = "vpc2-instance2-ssh"
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       target_tags   = ["vpc2-instance"]
       allow_list = [
         {
@@ -228,7 +228,7 @@ module "consumer_vpc" {
   firewall_data = [
     {
       name          = "psc-consumer-ssh"
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       target_tags   = ["psc-instance"]
       allow_list = [
         {
@@ -520,7 +520,7 @@ module "vpn_consumer_vpc" {
   firewall_data = [
     {
       name          = "vpn-consumer-ssh"
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       target_tags   = ["vpn-consumer-instance"]
       allow_list = [
         {
