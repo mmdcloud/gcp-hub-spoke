@@ -707,24 +707,32 @@ module "hub-spoke" {
   export_psc      = true
   spokes = [
     {
-      spoke_name             = "spoke1"
-      location               = "global"
-      linked_vpc_network_uri = module.vpc1.self_link
+      spoke_name = "spoke1"
+      location   = "global"
+      linked_vpc_network = {
+        uri = module.vpc1.self_link
+      }
     },
     {
-      spoke_name             = "spoke2"
-      location               = "global"
-      linked_vpc_network_uri = module.vpc2.self_link
+      spoke_name = "spoke2"
+      location   = "global"
+      linked_vpc_network = {
+        uri = module.vpc2.self_link
+      }
     },
     {
-      spoke_name             = "spoke3-consumer"
-      location               = "global"
-      linked_vpc_network_uri = module.consumer_vpc.self_link
+      spoke_name = "spoke3-consumer"
+      location   = "global"
+      linked_vpc_network = {
+        uri = module.consumer_vpc.self_link
+      }
     },
     {
-      spoke_name             = "spoke4-consumer"
-      location               = "global"
-      linked_vpc_network_uri = module.vpn_consumer_vpc.self_link
+      spoke_name = "spoke4-consumer"
+      location   = "global"
+      linked_vpc_network = {
+        uri = module.vpn_consumer_vpc.self_link
+      }
     }
   ]
 }
