@@ -6,7 +6,25 @@ variable "project_id" {
   type        = string
 }
 
-variable "region" {
+variable "vpc1_region" {
+  description = "GCP region used for all regional resources (subnets, routers, VPN gateways, Cloud Run, LB, etc.)."
+  type        = string
+  default     = "us-central1"
+}
+
+variable "vpc2_region" {
+  description = "GCP region used for all regional resources (subnets, routers, VPN gateways, Cloud Run, LB, etc.)."
+  type        = string
+  default     = "us-central1"
+}
+
+variable "psc_region" {
+  description = "GCP region used for all regional resources (subnets, routers, VPN gateways, Cloud Run, LB, etc.)."
+  type        = string
+  default     = "us-central1"
+}
+
+variable "vpn_region" {
   description = "GCP region used for all regional resources (subnets, routers, VPN gateways, Cloud Run, LB, etc.)."
   type        = string
   default     = "us-central1"
@@ -111,6 +129,12 @@ variable "cloud_run_container_port" {
   default     = 8080
 }
 
+variable "cloud_run_allow_unauthenticated" {
+  description = "Whether to allow unauthenticated requests or not"
+  type        = bool
+  default     = false
+}
+
 #---------------------------------------------------------------
 # VPN (producer / consumer VPCs, routers, tunnels)
 #---------------------------------------------------------------
@@ -160,6 +184,30 @@ variable "consumer_peer_ip_address" {
   description = "Peer IP address used by the consumer router's BGP peer (producer side link-local address)."
   type        = string
   default     = "169.254.0.1"
+}
+
+variable "producer_router_interface_ip_range_2" {
+  description = "Link-local IP range for the producer router's second interface (BGP session, tunnel 1)."
+  type        = string
+  default     = "169.254.1.1/30"
+}
+
+variable "consumer_router_interface_ip_range_2" {
+  description = "Link-local IP range for the consumer router's second interface (BGP session, tunnel 1)."
+  type        = string
+  default     = "169.254.1.2/30"
+}
+
+variable "producer_peer_ip_address_2" {
+  description = "Peer IP address used by the producer router's second BGP peer (consumer side link-local address, tunnel 1)."
+  type        = string
+  default     = "169.254.1.2"
+}
+
+variable "consumer_peer_ip_address_2" {
+  description = "Peer IP address used by the consumer router's second BGP peer (producer side link-local address, tunnel 1)."
+  type        = string
+  default     = "169.254.1.1"
 }
 
 #---------------------------------------------------------------

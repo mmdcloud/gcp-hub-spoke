@@ -2,13 +2,12 @@
 # Core
 # ---------------------------------------------------------------
 project_id = "encoded-alpha-457108-e8"
-region     = "us-central1"
 
 # ---------------------------------------------------------------
 # Compute instances
 # ---------------------------------------------------------------
 machine_type            = "e2-micro"
-instance_image          = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+instance_image          = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
 instance_startup_script = "sudo apt-get update; sudo apt-get install nginx -y"
 
 # ---------------------------------------------------------------
@@ -50,4 +49,9 @@ consumer_peer_ip_address           = "169.254.0.1"
 # Hub-Spoke
 # ---------------------------------------------------------------
 hub_name        = "hub"
-hub_description = "A sample hub"
+hub_description = "NCC hub"
+vpc1_region = "us-central1"
+vpc2_region = "asia-south1"
+psc_region = "asia-south2"
+vpn_region = "us-west1"
+cloud_run_allow_unauthenticated = false

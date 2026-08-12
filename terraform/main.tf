@@ -1,7 +1,15 @@
 data "google_project" "project" {}
 
-resource "random_id" "vpn_shared_secret" {
-  byte_length = 16
+# -----------------------------------------------------------------------------------------
+# Registering vault provider
+# -----------------------------------------------------------------------------------------
+data "vault_generic_secret" "vpn_shared_secret" {
+  path = "secret/vpn-shared-secret"
+}
+
+data "google_compute_image" "ubuntu_2404" {
+  family  = "ubuntu-2404-lts-amd64"
+  project = "ubuntu-os-cloud"
 }
 
 #---------------------------------------------------------------
@@ -16,7 +24,7 @@ module "vpc1" {
   subnets = [
     {
       name                     = "vpc1-subnet"
-      region                   = var.region
+      region                   = var.vpc1_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
@@ -90,11 +98,11 @@ module "instance1" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance1"
   machine_type              = var.machine_type
-  zone                      = "${var.region}-a"
+  zone                      = "${var.vpc1_region}-a"
   metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = var.instance_image
+  image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
       network        = module.vpc1.vpc_id
@@ -117,7 +125,7 @@ module "vpc2" {
   subnets = [
     {
       name                     = "vpc2-subnet"
-      region                   = var.region
+      region                   = var.vpc2_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
@@ -191,11 +199,11 @@ module "instance2" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance2"
   machine_type              = var.machine_type
-  zone                      = "${var.region}-a"
+  zone                      = "${var.vpc2_region}-a"
   metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = var.instance_image
+  image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
       network        = module.vpc2.vpc_id
@@ -218,7 +226,7 @@ module "consumer_vpc" {
   subnets = [
     {
       name                     = "consumer-subnet"
-      region                   = var.region
+      region                   = var.psc_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
@@ -293,7 +301,7 @@ module "producer_vpc" {
   subnets = [
     {
       name                     = "producer-subnet"
-      region                   = var.region
+      region                   = var.psc_region
       purpose                  = "PRIVATE"
       private_ip_google_access = true
       role                     = "ACTIVE"
@@ -301,7 +309,7 @@ module "producer_vpc" {
     },
     {
       name                     = "psc-subnet"
-      region                   = var.region
+      region                   = var.psc_region
       purpose                  = "PRIVATE_SERVICE_CONNECT"
       private_ip_google_access = true
       role                     = "ACTIVE"
@@ -309,7 +317,7 @@ module "producer_vpc" {
     },
     {
       name                     = "proxy-only-subnet"
-      region                   = var.region
+      region                   = var.psc_region
       purpose                  = "REGIONAL_MANAGED_PROXY"
       private_ip_google_access = false
       role                     = "ACTIVE"
@@ -321,7 +329,7 @@ module "producer_vpc" {
 
 module "artifact_registry" {
   source        = "./modules/artifact-registry"
-  location      = var.region
+  location      = var.psc_region
   description   = "nodeapp code repository"
   repository_id = var.artifact_repository_id
   shell_command = "bash ${path.cwd}/../src/artifact_push.sh ${data.google_project.project.project_id}"
@@ -343,7 +351,7 @@ module "cloud_run_service" {
   deletion_protection              = false
   ingress                          = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   service_account                  = module.cloud_run_service_account.sa_email
-  location                         = var.region
+  location                         = var.psc_region
   min_instance_count               = var.cloud_run_min_instances
   max_instance_count               = var.cloud_run_max_instances
   max_instance_request_concurrency = var.cloud_run_concurrency
@@ -362,14 +370,15 @@ module "cloud_run_service" {
       volume_mounts     = []
       cpu_idle          = true
       startup_cpu_boost = true
-      image             = "${var.region}-docker.pkg.dev/${data.google_project.project.project_id}/${var.artifact_repository_id}/${var.cloud_run_service_name}:latest"
+      image             = "${var.psc_region}-docker.pkg.dev/${data.google_project.project.project_id}/${var.artifact_repository_id}/${var.cloud_run_service_name}:latest"
     }
   ]
   depends_on = [module.artifact_registry]
 }
 
 resource "google_cloud_run_service_iam_member" "cloud_run_access" {
-  location = var.region
+  count    = var.cloud_run_allow_unauthenticated ? 1 : 0
+  location = var.psc_region
   project  = var.project_id
   service  = module.cloud_run_service.name
   role     = "roles/run.invoker"
@@ -380,7 +389,7 @@ module "service_neg" {
   source       = "./modules/network_endpoint_groups"
   neg_name     = "service-neg"
   neg_type     = "SERVERLESS"
-  location     = var.region
+  location     = var.psc_region
   service_name = module.cloud_run_service.name
 }
 
@@ -389,7 +398,7 @@ resource "google_compute_region_backend_service" "default" {
   protocol              = "HTTP"
   load_balancing_scheme = "INTERNAL_MANAGED"
   locality_lb_policy    = "ROUND_ROBIN"
-  region                = var.region
+  region                = var.psc_region
   backend {
     group = module.service_neg.id
   }
@@ -397,19 +406,19 @@ resource "google_compute_region_backend_service" "default" {
 
 resource "google_compute_region_url_map" "default" {
   name            = "url-map"
-  region          = var.region
+  region          = var.psc_region
   default_service = google_compute_region_backend_service.default.id
 }
 
 resource "google_compute_region_target_http_proxy" "default" {
   name    = "internal-http-proxy"
-  region  = var.region
+  region  = var.psc_region
   url_map = google_compute_region_url_map.default.id
 }
 
 resource "google_compute_forwarding_rule" "default" {
   name                  = "ilb-forwarding-rule"
-  region                = var.region
+  region                = var.psc_region
   load_balancing_scheme = "INTERNAL_MANAGED"
   port_range            = "80"
   target                = google_compute_region_target_http_proxy.default.id
@@ -420,7 +429,7 @@ resource "google_compute_forwarding_rule" "default" {
 
 resource "google_compute_service_attachment" "psc_attachment" {
   name                  = "psc-attachment"
-  region                = var.region
+  region                = var.psc_region
   description           = "Private Service Connect attachment for Cloud Run"
   project               = var.project_id
   enable_proxy_protocol = false
@@ -434,16 +443,16 @@ resource "google_compute_address" "psc_consumer_ip" {
   name         = "psc-consumer-ip"
   address_type = "INTERNAL"
   purpose      = "GCE_ENDPOINT"
-  region       = var.region
+  region       = var.psc_region
   subnetwork   = module.consumer_vpc.subnets[0].id
 }
 
 resource "google_compute_forwarding_rule" "psc_consumer_forwarding_rule" {
   name                  = "psc-consumer-forwarding-rule"
   project               = var.project_id
-  region                = var.region
+  region                = var.psc_region
   load_balancing_scheme = ""
-  target                = "projects/${var.project_id}/regions/${var.region}/serviceAttachments/${google_compute_service_attachment.psc_attachment.name}"
+  target                = "projects/${var.project_id}/regions/${var.psc_region}/serviceAttachments/${google_compute_service_attachment.psc_attachment.name}"
   ip_address            = google_compute_address.psc_consumer_ip.self_link
   network               = module.consumer_vpc.vpc_id
 }
@@ -452,11 +461,11 @@ module "consumer_instance" {
   source                    = "./modules/compute"
   name                      = "psc-instance"
   machine_type              = var.machine_type
-  zone                      = "${var.region}-a"
+  zone                      = "${var.psc_region}-a"
   metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = var.instance_image
+  image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
       network        = "${module.consumer_vpc.vpc_id}"
@@ -470,6 +479,12 @@ module "consumer_instance" {
 # --------------------------------------------------------------------------
 # VPN Configuration
 # --------------------------------------------------------------------------
+module "vpn_shared_secret" {
+  source      = "./modules/secret-manager"
+  secret_data = tostring(data.vault_generic_secret.vpn_shared_secret.data["secret"])
+  secret_id   = "vpn_shared_secret"
+}
+
 module "vpn_producer_vpc" {
   source                          = "./modules/vpc"
   vpc_name                        = "vpn-producer-vpc"
@@ -479,7 +494,7 @@ module "vpn_producer_vpc" {
   subnets = [
     {
       name                     = "vpn-producer-subnet"
-      region                   = var.region
+      region                   = var.vpn_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
@@ -510,7 +525,7 @@ module "vpn_consumer_vpc" {
   subnets = [
     {
       name                     = "vpn-consumer-subnet"
-      region                   = var.region
+      region                   = var.vpn_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
@@ -563,17 +578,6 @@ module "vpn_consumer_vpc" {
       ]
     },
     {
-      name          = "vpn-psc-firewall"
-      source_ranges = [module.psc_instance.network_ip]
-      target_tags   = ["psc-instance"]
-      allow_list = [
-        {
-          protocol = "icmp"
-          ports    = []
-        }
-      ]
-    },
-    {
       name          = "vpn-consumer-vpc-allow-from-producer-vpn"
       target_tags   = ["vpn-consumer-instance"]
       source_ranges = [var.vpn_producer_subnet_cidr]
@@ -588,16 +592,14 @@ module "vpn_consumer_vpc" {
 }
 
 resource "google_compute_ha_vpn_gateway" "producer_gateway" {
-  # FIXED: was `region = vpc.producer_region` (invalid reference)
-  region     = var.region
+  region     = var.vpn_region
   name       = "producer-vpn-gw"
   network    = module.vpn_producer_vpc.vpc_id
   stack_type = "IPV4_ONLY"
 }
 
 resource "google_compute_ha_vpn_gateway" "consumer_gateway" {
-  # FIXED: was `region = vpc.consumer_region` (invalid reference)
-  region     = var.region
+  region     = var.vpn_region
   name       = "consumer-vpn-gw"
   network    = module.vpn_consumer_vpc.vpc_id
   stack_type = "IPV4_ONLY"
@@ -606,7 +608,7 @@ resource "google_compute_ha_vpn_gateway" "consumer_gateway" {
 # --- Cloud Routers (needed for dynamic/BGP routing over HA VPN) ---
 resource "google_compute_router" "producer_router" {
   name    = "producer-router"
-  region  = var.region
+  region  = var.vpn_region
   network = module.vpn_producer_vpc.vpc_id
   bgp {
     asn = var.producer_bgp_asn
@@ -615,7 +617,7 @@ resource "google_compute_router" "producer_router" {
 
 resource "google_compute_router" "consumer_router" {
   name    = "consumer-router"
-  region  = var.region
+  region  = var.vpn_region
   network = module.vpn_consumer_vpc.vpc_id
   bgp {
     asn = var.consumer_bgp_asn
@@ -624,69 +626,123 @@ resource "google_compute_router" "consumer_router" {
 
 # --- VPN Tunnels (single interface pair; see note below for full HA) ---
 resource "google_compute_vpn_tunnel" "producer_to_consumer" {
-  name                  = "producer-to-consumer-tunnel"
-  region                = var.region
+  name                  = "producer-to-consumer-tunnel-0"
+  region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.producer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.consumer_gateway.id
-  shared_secret         = random_id.vpn_shared_secret.hex
+  shared_secret         = module.carshub_sql_password_secret.secret_data
   router                = google_compute_router.producer_router.id
   vpn_gateway_interface = 0
 }
 
+resource "google_compute_vpn_tunnel" "producer_to_consumer_2" {
+  name                  = "producer-to-consumer-tunnel-1"
+  region                = var.vpn_region
+  vpn_gateway           = google_compute_ha_vpn_gateway.producer_gateway.id
+  peer_gcp_gateway      = google_compute_ha_vpn_gateway.consumer_gateway.id
+  shared_secret         = module.carshub_sql_password_secret.secret_data
+  router                = google_compute_router.producer_router.id
+  vpn_gateway_interface = 1
+}
+
 resource "google_compute_vpn_tunnel" "consumer_to_producer" {
-  name                  = "consumer-to-producer-tunnel"
-  region                = var.region
+  name                  = "consumer-to-producer-tunnel-0"
+  region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.consumer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.producer_gateway.id
-  shared_secret         = random_id.vpn_shared_secret.hex
+  shared_secret         = module.carshub_sql_password_secret.secret_data
   router                = google_compute_router.consumer_router.id
   vpn_gateway_interface = 0
 }
 
+resource "google_compute_vpn_tunnel" "consumer_to_producer_2" {
+  name                  = "consumer-to-producer-tunnel-1"
+  region                = var.vpn_region
+  vpn_gateway           = google_compute_ha_vpn_gateway.consumer_gateway.id
+  peer_gcp_gateway      = google_compute_ha_vpn_gateway.producer_gateway.id
+  shared_secret         = module.carshub_sql_password_secret.secret_data
+  router                = google_compute_router.consumer_router.id
+  vpn_gateway_interface = 1
+}
+
 # --- Router interfaces + BGP peers (this is what actually exchanges routes) ---
 resource "google_compute_router_interface" "producer_interface" {
-  name       = "producer-router-if"
+  name       = "producer-router-if-0"
   router     = google_compute_router.producer_router.name
-  region     = var.region
+  region     = var.vpn_region
   ip_range   = var.producer_router_interface_ip_range
   vpn_tunnel = google_compute_vpn_tunnel.producer_to_consumer.name
 }
 
 resource "google_compute_router_peer" "producer_peer" {
-  name            = "producer-router-peer"
+  name            = "producer-router-peer-0"
   router          = google_compute_router.producer_router.name
-  region          = var.region
+  region          = var.vpn_region
   peer_ip_address = var.producer_peer_ip_address
   peer_asn        = var.consumer_bgp_asn
   interface       = google_compute_router_interface.producer_interface.name
 }
 
+resource "google_compute_router_interface" "producer_interface_2" {
+  name       = "producer-router-if-1"
+  router     = google_compute_router.producer_router.name
+  region     = var.vpn_region
+  ip_range   = var.producer_router_interface_ip_range_2
+  vpn_tunnel = google_compute_vpn_tunnel.producer_to_consumer_2.name
+}
+
+resource "google_compute_router_peer" "producer_peer_2" {
+  name            = "producer-router-peer-1"
+  router          = google_compute_router.producer_router.name
+  region          = var.vpn_region
+  peer_ip_address = var.producer_peer_ip_address_2
+  peer_asn        = var.consumer_bgp_asn
+  interface       = google_compute_router_interface.producer_interface_2.name
+}
+
 resource "google_compute_router_interface" "consumer_interface" {
-  name       = "consumer-router-if"
+  name       = "consumer-router-if-0"
   router     = google_compute_router.consumer_router.name
-  region     = var.region
+  region     = var.vpn_region
   ip_range   = var.consumer_router_interface_ip_range
   vpn_tunnel = google_compute_vpn_tunnel.consumer_to_producer.name
 }
 
 resource "google_compute_router_peer" "consumer_peer" {
-  name            = "consumer-router-peer"
+  name            = "consumer-router-peer-0"
   router          = google_compute_router.consumer_router.name
-  region          = var.region
+  region          = var.vpn_region
   peer_ip_address = var.consumer_peer_ip_address
   peer_asn        = var.producer_bgp_asn
   interface       = google_compute_router_interface.consumer_interface.name
+}
+
+resource "google_compute_router_interface" "consumer_interface_2" {
+  name       = "consumer-router-if-1"
+  router     = google_compute_router.consumer_router.name
+  region     = var.vpn_region
+  ip_range   = var.consumer_router_interface_ip_range_2
+  vpn_tunnel = google_compute_vpn_tunnel.consumer_to_producer_2.name
+}
+
+resource "google_compute_router_peer" "consumer_peer_2" {
+  name            = "consumer-router-peer-1"
+  router          = google_compute_router.consumer_router.name
+  region          = var.vpn_region
+  peer_ip_address = var.consumer_peer_ip_address_2
+  peer_asn        = var.producer_bgp_asn
+  interface       = google_compute_router_interface.consumer_interface_2.name
 }
 
 module "vpn_consumer_instance" {
   source                    = "./modules/compute"
   name                      = "vpn-consumer-instance"
   machine_type              = var.machine_type
-  zone                      = "${var.region}-a"
+  zone                      = "${var.vpn_region}-a"
   metadata_startup_script   = var.instance_startup_script
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = var.instance_image
+  image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
       network        = "${module.vpn_consumer_vpc.vpc_id}"
