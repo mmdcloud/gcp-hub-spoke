@@ -45,7 +45,7 @@ module "vpc1" {
     },
     {
       name          = "vpc1-instance2-firewall"
-      source_ranges = [module.instance2.network_ip]
+      source_ranges = [var.vpc2_subnet_cidr]
       target_tags   = ["vpc1-instance"]
       allow_list = [
         {
@@ -56,7 +56,7 @@ module "vpc1" {
     },
     {
       name          = "vpc1-psc-instance-ping"
-      source_ranges = [module.consumer_instance.network_ip]
+      source_ranges = [var.consumer_subnet_cidr]
       target_tags   = ["vpc1-instance"]
       allow_list = [
         {
@@ -79,7 +79,7 @@ module "vpc1" {
     {
       name          = "vpc1-vpn-allow"
       target_tags   = ["vpc1-instance"]
-      source_ranges = [module.vpn_consumer_instance.network_ip]
+      source_ranges = [var.vpn_consumer_subnet_cidr]
       allow_list = [
         {
           protocol = "icmp"
@@ -90,17 +90,13 @@ module "vpc1" {
   ]
 }
 
-resource "google_compute_address" "instance1_ip" {
-  name = "instance1-address"
-}
-
 module "instance1" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance1"
   machine_type              = var.machine_type
   zone                      = "${var.vpc1_region}-a"
   metadata_startup_script   = var.instance_startup_script
-  deletion_protection       = false
+  deletion_protection       = false # should be true for production
   allow_stopping_for_update = true
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
@@ -146,7 +142,7 @@ module "vpc2" {
     },
     {
       name          = "vpc2-instance1-firewall"
-      source_ranges = [module.instance1.network_ip]
+      source_ranges = [var.vpc1_subnet_cidr]
       target_tags   = ["vpc2-instance"]
       allow_list = [
         {
@@ -157,7 +153,7 @@ module "vpc2" {
     },
     {
       name          = "vpc2-psc-instance-ping"
-      source_ranges = [module.consumer_instance.network_ip]
+      source_ranges = [var.consumer_subnet_cidr]
       target_tags   = ["vpc2-instance"]
       allow_list = [
         {
@@ -180,7 +176,7 @@ module "vpc2" {
     {
       name          = "vpc2-vpn-allow"
       target_tags   = ["vpc2-instance"]
-      source_ranges = [module.vpn_consumer_instance.network_ip]
+      source_ranges = [var.vpn_consumer_subnet_cidr]
       allow_list = [
         {
           protocol = "icmp"
@@ -191,17 +187,13 @@ module "vpc2" {
   ]
 }
 
-resource "google_compute_address" "instance2_ip" {
-  name = "instance2-address"
-}
-
 module "instance2" {
   source                    = "./modules/compute"
   name                      = "connectivity-instance2"
   machine_type              = var.machine_type
   zone                      = "${var.vpc2_region}-a"
   metadata_startup_script   = var.instance_startup_script
-  deletion_protection       = false
+  deletion_protection       = false # should be true for production
   allow_stopping_for_update = true
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
@@ -247,7 +239,7 @@ module "consumer_vpc" {
     },
     {
       name          = "psc-instance1-firewall"
-      source_ranges = [module.instance1.network_ip]
+      source_ranges = [var.vpc1_subnet_cidr]
       target_tags   = ["psc-instance"]
       allow_list = [
         {
@@ -258,7 +250,7 @@ module "consumer_vpc" {
     },
     {
       name          = "psc-instance2-firewall"
-      source_ranges = [module.instance2.network_ip]
+      source_ranges = [var.vpc2_subnet_cidr]
       target_tags   = ["psc-instance"]
       allow_list = [
         {
@@ -281,7 +273,7 @@ module "consumer_vpc" {
     {
       name          = "psc-vpn-allow"
       target_tags   = ["psc-instance"]
-      source_ranges = [module.vpn_consumer_instance.network_ip]
+      source_ranges = [var.vpn_consumer_subnet_cidr]
       allow_list = [
         {
           protocol = "icmp"
@@ -348,7 +340,7 @@ module "cloud_run_service_account" {
 
 module "cloud_run_service" {
   source                           = "./modules/cloud-run"
-  deletion_protection              = false
+  deletion_protection              = false # should be true for production
   ingress                          = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   service_account                  = module.cloud_run_service_account.sa_email
   location                         = var.psc_region
@@ -463,7 +455,7 @@ module "consumer_instance" {
   machine_type              = var.machine_type
   zone                      = "${var.psc_region}-a"
   metadata_startup_script   = var.instance_startup_script
-  deletion_protection       = false
+  deletion_protection       = false # should be true for production
   allow_stopping_for_update = true
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
@@ -546,7 +538,7 @@ module "vpn_consumer_vpc" {
     },
     {
       name          = "vpn-instance1-firewall"
-      source_ranges = [module.instance1.network_ip]
+      source_ranges = [var.vpc1_subnet_cidr]
       target_tags   = ["vpn-consumer-instance"]
       allow_list = [
         {
@@ -557,7 +549,7 @@ module "vpn_consumer_vpc" {
     },
     {
       name          = "vpn-instance2-firewall"
-      source_ranges = [module.instance2.network_ip]
+      source_ranges = [var.vpc2_subnet_cidr]
       target_tags   = ["vpn-consumer-instance"]
       allow_list = [
         {
@@ -630,7 +622,7 @@ resource "google_compute_vpn_tunnel" "producer_to_consumer" {
   region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.producer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.consumer_gateway.id
-  shared_secret         = module.carshub_sql_password_secret.secret_data
+  shared_secret         = module.vpn_shared_secret.secret_data
   router                = google_compute_router.producer_router.id
   vpn_gateway_interface = 0
 }
@@ -640,7 +632,7 @@ resource "google_compute_vpn_tunnel" "producer_to_consumer_2" {
   region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.producer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.consumer_gateway.id
-  shared_secret         = module.carshub_sql_password_secret.secret_data
+  shared_secret         = module.vpn_shared_secret.secret_data
   router                = google_compute_router.producer_router.id
   vpn_gateway_interface = 1
 }
@@ -650,7 +642,7 @@ resource "google_compute_vpn_tunnel" "consumer_to_producer" {
   region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.consumer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.producer_gateway.id
-  shared_secret         = module.carshub_sql_password_secret.secret_data
+  shared_secret         = module.vpn_shared_secret.secret_data
   router                = google_compute_router.consumer_router.id
   vpn_gateway_interface = 0
 }
@@ -660,7 +652,7 @@ resource "google_compute_vpn_tunnel" "consumer_to_producer_2" {
   region                = var.vpn_region
   vpn_gateway           = google_compute_ha_vpn_gateway.consumer_gateway.id
   peer_gcp_gateway      = google_compute_ha_vpn_gateway.producer_gateway.id
-  shared_secret         = module.carshub_sql_password_secret.secret_data
+  shared_secret         = module.vpn_shared_secret.secret_data
   router                = google_compute_router.consumer_router.id
   vpn_gateway_interface = 1
 }
@@ -740,7 +732,7 @@ module "vpn_consumer_instance" {
   machine_type              = var.machine_type
   zone                      = "${var.vpn_region}-a"
   metadata_startup_script   = var.instance_startup_script
-  deletion_protection       = false
+  deletion_protection       = false # should be true for production
   allow_stopping_for_update = true
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
