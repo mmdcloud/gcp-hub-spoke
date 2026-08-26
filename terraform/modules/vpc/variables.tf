@@ -4,10 +4,12 @@ variable "auto_create_subnetworks" {}
 variable "routing_mode" {}
 variable "firewall_data" {
   type = list(object({
-    name          = string
-    source_ranges = optional(set(string))
-    target_tags   = set(string)
-    source_tags   = optional(set(string))
+    name               = string
+    source_ranges      = optional(set(string))
+    destination_ranges = optional(set(string))
+    direction          = optional(string)
+    target_tags        = optional(set(string))
+    source_tags        = optional(set(string))
     allow_list = set(object({
       protocol = string
       ports    = list(string)

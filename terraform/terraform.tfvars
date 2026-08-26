@@ -54,4 +54,4 @@ vpc1_region                     = "us-central1"
 vpc2_region                     = "asia-south1"
 psc_region                      = "us-central1"
 vpn_region                      = "us-west1"
-cloud_run_allow_unauthenticated = false
+cloud_run_allow_unauthenticated = true

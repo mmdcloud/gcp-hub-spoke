@@ -211,6 +211,21 @@ variable "consumer_peer_ip_address_2" {
 }
 
 #---------------------------------------------------------------
+# Cloud SQL Variables
+#---------------------------------------------------------------
+variable "cloudsql_vpc_region" {
+  description = "Region for cloud sql"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "cloudsql_vpc_subnet_cidr" {
+  description = "CIDR range for the PSC producer (PRIVATE) subnet."
+  type        = string
+  default     = "10.7.0.0/24"
+}
+
+#---------------------------------------------------------------
 # Hub-Spoke
 #---------------------------------------------------------------
 variable "hub_name" {
