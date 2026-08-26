@@ -15,6 +15,12 @@ variable "hub_labels" {
   default     = {}
 }
 
+variable "hub_policy_mode" {
+  type        = string
+  description = "Policy mode for the hub"
+  default     = "PRESET"
+}
+
 variable "export_psc" {
   type        = bool
   description = "Labels to apply to the hub."

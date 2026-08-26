@@ -3,9 +3,9 @@ data "google_project" "project" {}
 # -----------------------------------------------------------------------------------------
 # Registering vault provider
 # -----------------------------------------------------------------------------------------
-data "vault_generic_secret" "vpn_shared_secret" {
-  path = "secret/vpn-shared-secret"
-}
+# data "vault_generic_secret" "vpn_shared_secret" {
+#   path = "secret/vpn-shared-secret"
+# }
 
 data "google_compute_image" "ubuntu_2404" {
   family  = "ubuntu-2404-lts-amd64"
@@ -324,7 +324,19 @@ module "artifact_registry" {
   location      = var.psc_region
   description   = "nodeapp code repository"
   repository_id = var.artifact_repository_id
-  shell_command = "bash ${path.cwd}/../src/artifact_push.sh ${data.google_project.project.project_id}"
+}
+
+resource "null_resource" "build_and_push_image" {
+  triggers = {
+    always_run = timestamp()
+  }
+  provisioner "local-exec" {
+    command = "bash ${path.cwd}/../src/artifact_push.sh ${var.psc_region} ${data.google_project.project.project_id}"
+  }
+
+  depends_on = [
+    module.artifact_registry
+  ]
 }
 
 module "cloud_run_service_account" {
@@ -365,7 +377,7 @@ module "cloud_run_service" {
       image             = "${var.psc_region}-docker.pkg.dev/${data.google_project.project.project_id}/${var.artifact_repository_id}/${var.cloud_run_service_name}:latest"
     }
   ]
-  depends_on = [module.artifact_registry]
+  depends_on = [null_resource.build_and_push_image]
 }
 
 resource "google_cloud_run_service_iam_member" "cloud_run_access" {

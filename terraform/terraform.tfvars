@@ -48,10 +48,10 @@ consumer_peer_ip_address           = "169.254.0.1"
 # ---------------------------------------------------------------
 # Hub-Spoke
 # ---------------------------------------------------------------
-hub_name        = "hub"
-hub_description = "NCC hub"
-vpc1_region = "us-central1"
-vpc2_region = "asia-south1"
-psc_region = "asia-south2"
-vpn_region = "us-west1"
+hub_name                        = "hub"
+hub_description                 = "NCC hub"
+vpc1_region                     = "us-central1"
+vpc2_region                     = "asia-south1"
+psc_region                      = "us-central1"
+vpn_region                      = "us-west1"
 cloud_run_allow_unauthenticated = false

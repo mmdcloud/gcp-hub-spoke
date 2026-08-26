@@ -2,6 +2,7 @@ resource "google_network_connectivity_hub" "hub" {
   name        = var.hub_name
   description = var.hub_description
   export_psc  = var.export_psc
+  policy_mode = var.hub_policy_mode
   labels      = merge({ name = var.hub_name }, var.hub_labels)
 }
 

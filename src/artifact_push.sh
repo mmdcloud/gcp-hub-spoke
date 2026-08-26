@@ -3,6 +3,8 @@ mkdir code
 cp -r ../src/* code/
 cd code
 
+gcloud auth configure-docker "${1}-docker.pkg.dev" --quiet
+
 docker buildx build --tag nodeapp --file ./Dockerfile .
-docker tag nodeapp:latest us-central1-docker.pkg.dev/$1/nodeapp/nodeapp:latest
-docker push us-central1-docker.pkg.dev/$1/nodeapp/nodeapp:latest
+docker tag nodeapp:latest $1-docker.pkg.dev/$2/nodeapp/nodeapp:latest
+docker push $1-docker.pkg.dev/$2/nodeapp/nodeapp:latest

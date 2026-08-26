@@ -9,10 +9,10 @@ terraform {
       version = "~> 4.0"
     }
   }
-  backend "gcs" {
-    bucket = "hub-spoke-tf-state"
-    prefix = "state.tf"
-  }
+  # backend "gcs" {
+  #   bucket = "hub-spoke-tf-state"
+  #   prefix = "state.tf"
+  # }
 }
 
 # Configure the Google Provider
