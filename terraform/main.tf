@@ -262,7 +262,7 @@ module "consumer_vpc" {
     {
       name               = "psc-consumer-instance-firewall"
       direction          = "INGRESS"
-      source_ranges      = [var.vpc2_subnet_cidr]
+      source_ranges      = [var.vpc1_subnet_cidr]
       destination_ranges = ["${google_compute_address.psc_consumer_ip.address}"]
       allow_list = [
         {
@@ -508,9 +508,31 @@ module "vpn_producer_vpc" {
   ]
   firewall_data = [
     {
+      name          = "vpn-producer-ssh"
+      source_ranges = ["35.235.240.0/20"]
+      target_tags   = ["vpn-producer-instance"]
+      allow_list = [
+        {
+          protocol = "tcp"
+          ports    = ["22"]
+        }
+      ]
+    },
+    {
       name          = "vpn-producer-vpc-allow-from-consumer-vpn"
       target_tags   = ["vpn-producer-instance"]
       source_ranges = [var.vpn_consumer_subnet_cidr]
+      allow_list = [
+        {
+          protocol = "icmp"
+          ports    = []
+        }
+      ]
+    },
+    {
+      name          = "vpn-producer-instance1-firewall"
+      source_ranges = [var.vpc1_subnet_cidr]
+      target_tags   = ["vpn-producer-instance"]
       allow_list = [
         {
           protocol = "icmp"
@@ -719,7 +741,7 @@ resource "google_compute_router_peer" "consumer_peer" {
   region          = var.vpn_region
   peer_ip_address = var.consumer_peer_ip_address
   peer_asn        = var.producer_bgp_asn
-  interface       = google_compute_router_interface.consumer_interface.name
+  interface       = google_compute_router_interface.consumer_interface.name  
 }
 
 resource "google_compute_router_interface" "consumer_interface_2" {
@@ -736,7 +758,7 @@ resource "google_compute_router_peer" "consumer_peer_2" {
   region          = var.vpn_region
   peer_ip_address = var.consumer_peer_ip_address_2
   peer_asn        = var.producer_bgp_asn
-  interface       = google_compute_router_interface.consumer_interface_2.name
+  interface       = google_compute_router_interface.consumer_interface_2.name  
 }
 
 module "vpn_consumer_instance" {
@@ -756,6 +778,25 @@ module "vpn_consumer_instance" {
     }
   ]
   tags = ["vpn-consumer-instance"]
+}
+
+module "vpn_producer_instance" {
+  source                    = "./modules/compute"
+  name                      = "vpn-producer-instance"
+  machine_type              = var.machine_type
+  zone                      = "${var.vpn_region}-a"
+  metadata_startup_script   = var.instance_startup_script
+  deletion_protection       = false # should be true for production
+  allow_stopping_for_update = true
+  image                     = data.google_compute_image.ubuntu_2404.self_link
+  network_interfaces = [
+    {
+      network        = "${module.vpn_producer_vpc.vpc_id}"
+      subnetwork     = "${module.vpn_producer_vpc.subnets[0].id}"
+      access_configs = []
+    }
+  ]
+  tags = ["vpn-producer-instance"]
 }
 
 # -----------------------------------------------------------------------------------------
@@ -868,47 +909,43 @@ module "hub-spoke" {
   export_psc      = true
   spokes = [
     {
-      spoke_name = "spoke1"
+      spoke_name = "vpc1-spoke"
       location   = "global"
       linked_vpc_network = {
         uri = module.vpc1.self_link
       }
     },
     {
-      spoke_name = "spoke2"
+      spoke_name = "vpc2-spoke"
       location   = "global"
       linked_vpc_network = {
         uri = module.vpc2.self_link
       }
     },
     {
-      spoke_name = "spoke3-consumer"
+      spoke_name = "psc-spoke"
       location   = "global"
       linked_vpc_network = {
         uri = module.consumer_vpc.self_link
       }
     },
+    {
+      spoke_name = "spoke-vpn-consumer"
+      location   = "global"
+      linked_vpc_network = {
+        uri = module.vpn_consumer_vpc.self_link
+      }
+    },
     # {
-    #   spoke_name = "cloudsql"
+    #   spoke_name = "cloudsql-spoke"
     #   location   = "global"
     #   linked_producer_vpc_network = {
     #     uri = module.cloudsql_vpc.self_link
     #   }
     # },
-    # --- VPN tunnel spokes ---
+    # --- VPN tunnel spokes ---    
     {
-      spoke_name = "spoke-vpn-producer"
-      location   = var.vpn_region
-      linked_vpn_tunnels = {
-        uris = [
-          google_compute_vpn_tunnel.producer_to_consumer.id,
-          google_compute_vpn_tunnel.producer_to_consumer_2.id,
-        ]
-        site_to_site_data_transfer = true
-      }
-    },
-    {
-      spoke_name = "spoke-vpn-consumer"
+      spoke_name = "spoke-vpn-consumer-hybrid"
       location   = var.vpn_region
       linked_vpn_tunnels = {
         uris = [
@@ -916,6 +953,7 @@ module "hub-spoke" {
           google_compute_vpn_tunnel.consumer_to_producer_2.id,
         ]
         site_to_site_data_transfer = true
+        include_import_ranges      = ["ALL_IPV4_RANGES"]
       }
     }
   ]
