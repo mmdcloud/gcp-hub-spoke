@@ -263,7 +263,7 @@ module "consumer_vpc" {
       name               = "psc-consumer-instance-firewall"
       direction          = "INGRESS"
       source_ranges      = [var.vpc1_subnet_cidr]
-      destination_ranges = ["${google_compute_address.psc_consumer_ip.address}"]
+      destination_ranges = [google_compute_address.psc_consumer_ip.address]
       allow_list = [
         {
           protocol = "tcp"
@@ -468,8 +468,8 @@ module "consumer_instance" {
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
-      network        = "${module.consumer_vpc.vpc_id}"
-      subnetwork     = "${module.consumer_vpc.subnets[0].id}"
+      network        = module.consumer_vpc.vpc_id
+      subnetwork     = module.consumer_vpc.subnets[0].id
       access_configs = []
     }
   ]
@@ -774,8 +774,8 @@ module "vpn_consumer_instance" {
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
-      network        = "${module.vpn_consumer_vpc.vpc_id}"
-      subnetwork     = "${module.vpn_consumer_vpc.subnets[0].id}"
+      network        = module.vpn_consumer_vpc.vpc_id
+      subnetwork     = module.vpn_consumer_vpc.subnets[0].id
       access_configs = []
     }
   ]
@@ -793,8 +793,8 @@ module "vpn_producer_instance" {
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
-      network        = "${module.vpn_producer_vpc.vpc_id}"
-      subnetwork     = "${module.vpn_producer_vpc.subnets[0].id}"
+      network        = module.vpn_producer_vpc.vpc_id
+      subnetwork     = module.vpn_producer_vpc.subnets[0].id
       access_configs = []
     }
   ]
@@ -804,102 +804,102 @@ module "vpn_producer_instance" {
 # -----------------------------------------------------------------------------------------
 # Cloud SQL Configuration
 # -----------------------------------------------------------------------------------------
-# module "cloudsql_vpc" {
-#   source                          = "./modules/vpc"
-#   vpc_name                        = "cloudsql-vpc"
-#   delete_default_routes_on_create = false
-#   auto_create_subnetworks         = false
-#   routing_mode                    = "REGIONAL"
-#   subnets = [
-#     {
-#       name                     = "cloudsql-subnet"
-#       region                   = var.cloudsql_vpc_region
-#       purpose                  = "PRIVATE"
-#       role                     = "ACTIVE"
-#       private_ip_google_access = true
-#       ip_cidr_range            = var.cloudsql_vpc_subnet_cidr
-#     }
-#   ]
-#   firewall_data = []
-# }
+module "cloudsql_vpc" {
+  source                          = "./modules/vpc"
+  vpc_name                        = "cloudsql-vpc"
+  delete_default_routes_on_create = false
+  auto_create_subnetworks         = false
+  routing_mode                    = "REGIONAL"
+  subnets = [
+    {
+      name                     = "cloudsql-subnet"
+      region                   = var.cloudsql_vpc_region
+      purpose                  = "PRIVATE"
+      role                     = "ACTIVE"
+      private_ip_google_access = true
+      ip_cidr_range            = var.cloudsql_vpc_subnet_cidr
+    }
+  ]
+  firewall_data = []
+}
 
-# module "sql_password_secret" {
-#   source      = "./modules/secret-manager"
-#   secret_data = tostring(data.vault_generic_secret.sql.data["password"])
-#   secret_id   = "db-password-secret"
-# }
+module "sql_password_secret" {
+  source      = "./modules/secret-manager"
+  secret_data = tostring(data.vault_generic_secret.sql.data["password"])
+  secret_id   = "db-password-secret"
+}
 
-# module "sql_username_secret" {
-#   source      = "./modules/secret-manager"
-#   secret_data = tostring(data.vault_generic_secret.sql.data["username"])
-#   secret_id   = "db-username-secret"
-# }
+module "sql_username_secret" {
+  source      = "./modules/secret-manager"
+  secret_data = tostring(data.vault_generic_secret.sql.data["username"])
+  secret_id   = "db-username-secret"
+}
 
-# module "db" {
-#   source                      = "./modules/cloud-sql"
-#   name                        = "db-instance"
-#   db_name                     = "db-instance"
-#   db_user                     = module.sql_username_secret.secret_data
-#   db_version                  = "MYSQL_8_0"
-#   location                    = var.cloudsql_vpc_region
-#   tier                        = "db-custom-2-8192"
-#   availability_type           = "REGIONAL"
-#   disk_size                   = 100 # GB
-#   disk_type                   = "PD_SSD"
-#   disk_autoresize             = true
-#   disk_autoresize_limit       = 500 # GB
-#   ipv4_enabled                = false
-#   deletion_protection_enabled = false # true for production
-#   backup_configuration = [
-#     {
-#       enabled                        = true
-#       binary_log_enabled             = true
-#       start_time                     = "03:00"
-#       location                       = var.cloudsql_vpc_region
-#       point_in_time_recovery_enabled = false
-#       backup_retention_settings = [
-#         {
-#           retained_backups = 30
-#           retention_unit   = "COUNT"
-#         }
-#       ]
-#     }
-#   ]
-#   database_flags = [
-#     {
-#       name  = "general_log"
-#       value = "off"
-#     },
-#     {
-#       name  = "log_queries_not_using_indexes"
-#       value = "on"
-#     },
-#     {
-#       name  = "max_connections"
-#       value = "1000"
-#     },
-#     {
-#       name  = "skip_show_database"
-#       value = "on"
-#     },
-#     {
-#       name  = "slow_query_log"
-#       value = "on"
-#     },
-#     {
-#       name  = "long_query_time"
-#       value = "2"
-#     },
-#     {
-#       name  = "log_output"
-#       value = "FILE"
-#     }
-#   ]
-#   vpc_self_link = module.cloudsql_vpc.self_link
-#   vpc_id        = module.cloudsql_vpc.vpc_id
-#   password      = module.sql_password_secret.secret_data
-#   depends_on    = [module.sql_password_secret, module.sql_username_secret]
-# }
+module "db" {
+  source                      = "./modules/cloud-sql"
+  name                        = "db-instance"
+  db_name                     = "db-instance"
+  db_user                     = module.sql_username_secret.secret_data
+  db_version                  = "MYSQL_8_0"
+  location                    = var.cloudsql_vpc_region
+  tier                        = "db-custom-2-8192"
+  availability_type           = "REGIONAL"
+  disk_size                   = 100 # GB
+  disk_type                   = "PD_SSD"
+  disk_autoresize             = true
+  disk_autoresize_limit       = 500 # GB
+  ipv4_enabled                = false
+  deletion_protection_enabled = false # true for production
+  backup_configuration = [
+    {
+      enabled                        = true
+      binary_log_enabled             = true
+      start_time                     = "03:00"
+      location                       = var.cloudsql_vpc_region
+      point_in_time_recovery_enabled = false
+      backup_retention_settings = [
+        {
+          retained_backups = 30
+          retention_unit   = "COUNT"
+        }
+      ]
+    }
+  ]
+  database_flags = [
+    {
+      name  = "general_log"
+      value = "off"
+    },
+    {
+      name  = "log_queries_not_using_indexes"
+      value = "on"
+    },
+    {
+      name  = "max_connections"
+      value = "1000"
+    },
+    {
+      name  = "skip_show_database"
+      value = "on"
+    },
+    {
+      name  = "slow_query_log"
+      value = "on"
+    },
+    {
+      name  = "long_query_time"
+      value = "2"
+    },
+    {
+      name  = "log_output"
+      value = "FILE"
+    }
+  ]
+  vpc_self_link = module.cloudsql_vpc.self_link
+  vpc_id        = module.cloudsql_vpc.vpc_id
+  password      = module.sql_password_secret.secret_data
+  depends_on    = [module.sql_password_secret, module.sql_username_secret]
+}
 
 #---------------------------------------------------------------
 # Hub-Spoke: all four VPCs attached as spokes to the same hub

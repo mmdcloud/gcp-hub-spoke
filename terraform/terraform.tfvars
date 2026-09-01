@@ -7,7 +7,6 @@ project_id = "encoded-alpha-457108-e8"
 # Compute instances
 # ---------------------------------------------------------------
 machine_type            = "e2-micro"
-instance_image          = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
 instance_startup_script = "sudo apt-get update; sudo apt-get install nginx -y"
 
 # ---------------------------------------------------------------

@@ -39,12 +39,6 @@ variable "machine_type" {
   default     = "e2-micro"
 }
 
-variable "instance_image" {
-  description = "Boot image used for all demo compute instances."
-  type        = string
-  default     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
-}
-
 variable "instance_startup_script" {
   description = "Startup script executed on all demo compute instances."
   type        = string
