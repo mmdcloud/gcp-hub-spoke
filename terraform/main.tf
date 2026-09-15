@@ -322,6 +322,8 @@ module "producer_vpc" {
 
 module "artifact_registry" {
   source        = "./modules/artifact-registry"
+  project_id    = var.project_id
+  artifact_type = "DOCKER"
   location      = var.psc_region
   description   = "nodeapp code repository"
   repository_id = var.artifact_repository_id
@@ -353,6 +355,8 @@ module "cloud_run_service_account" {
 
 module "cloud_run_service" {
   source                           = "./modules/cloud-run"
+  project_id                       = var.project_id
+  type                             = "SERVICE"
   deletion_protection              = false # should be true for production
   ingress                          = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   service_account                  = module.cloud_run_service_account.sa_email
@@ -761,6 +765,86 @@ resource "google_compute_router_peer" "consumer_peer_2" {
   peer_ip_address = var.consumer_peer_ip_address_2
   peer_asn        = var.producer_bgp_asn
   interface       = google_compute_router_interface.consumer_interface_2.name
+}
+
+module "producer_vpn" {
+  source     = "./modules/vpn-ha"
+  name       = "producer-vpn-gw"
+  project_id = var.project_id
+  region     = var.vpn_region
+  network    = module.vpn_producer_vpc.vpc_id
+  stack_type = "IPV4_ONLY"
+
+  router_asn = var.producer_bgp_asn
+
+  # Peer gateway is the consumer side's HA VPN gateway created below.
+  peer_gcp_gateway = module.consumer_vpn.self_link
+
+  tunnels = {
+    tunnel-0 = {
+      bgp_peer = {
+        address = var.producer_peer_ip_address
+        asn     = var.consumer_bgp_asn
+      }
+      bgp_session_range     = var.producer_router_interface_ip_range
+      vpn_gateway_interface = 0
+      shared_secret         = module.vpn_shared_secret.secret_data
+    }
+    tunnel-1 = {
+      bgp_peer = {
+        address = var.producer_peer_ip_address_2
+        asn     = var.consumer_bgp_asn
+      }
+      bgp_session_range     = var.producer_router_interface_ip_range_2
+      vpn_gateway_interface = 1
+      shared_secret         = module.vpn_shared_secret.secret_data
+    }
+  }
+}
+
+module "consumer_vpn" {
+  source     = "./modules/vpn-ha"
+  name       = "consumer-vpn-gw"
+  project_id = var.project_id
+  region     = var.vpn_region
+  network    = module.vpn_consumer_vpc.vpc_id
+  stack_type = "IPV4_ONLY"
+
+  router_asn = var.consumer_bgp_asn
+
+  # Reproduces the original consumer_router's custom BGP advertisement:
+  # advertise all of this router's own subnets, plus vpc1's subnet via NCC hub.
+  router_advertise_config = {
+    mode   = "CUSTOM"
+    groups = ["ALL_SUBNETS"]
+    ip_ranges = {
+      (var.vpc1_subnet_cidr) = "vpc1 subnet via NCC hub"
+    }
+  }
+
+  # Peer gateway is the producer side's HA VPN gateway created above.
+  peer_gcp_gateway = module.producer_vpn.self_link
+
+  tunnels = {
+    tunnel-0 = {
+      bgp_peer = {
+        address = var.consumer_peer_ip_address
+        asn     = var.producer_bgp_asn
+      }
+      bgp_session_range     = var.consumer_router_interface_ip_range
+      vpn_gateway_interface = 0
+      shared_secret         = module.vpn_shared_secret.secret_data
+    }
+    tunnel-1 = {
+      bgp_peer = {
+        address = var.consumer_peer_ip_address_2
+        asn     = var.producer_bgp_asn
+      }
+      bgp_session_range     = var.consumer_router_interface_ip_range_2
+      vpn_gateway_interface = 1
+      shared_secret         = module.vpn_shared_secret.secret_data
+    }
+  }
 }
 
 module "vpn_consumer_instance" {
