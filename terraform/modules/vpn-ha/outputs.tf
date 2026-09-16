@@ -49,6 +49,14 @@ output "tunnel_names" {
   }
 }
 
+output "tunnel_ids" {
+  description = "VPN tunnel ids."
+  value = {
+    for name in keys(var.tunnels) :
+    name => google_compute_vpn_tunnel.tunnels[name].id
+  }
+}
+
 output "tunnel_self_links" {
   description = "VPN tunnel self links."
   sensitive   = true

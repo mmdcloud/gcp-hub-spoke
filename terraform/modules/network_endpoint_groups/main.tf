@@ -18,7 +18,7 @@ resource "google_compute_network_endpoint_group" "neg" {
 
 }
 
-resource "google_compute_region_network_endpoint_group" "serverless_neg" {
+resource "google_compute_region_network_endpoint_group" "neg" {
   count                 = var.type == "REGIONAL" ? 1 : 0
   name                  = var.neg_name
   description           = var.description
