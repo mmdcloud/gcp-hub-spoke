@@ -3,7 +3,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 7.0"
+      version = "~> 8.0"
     }
     vault = {
       source  = "hashicorp/vault"
@@ -26,4 +26,4 @@ provider "google" {
   region  = "us-central1"
 }
 
-provider "vault" {}
+# provider "vault" {}

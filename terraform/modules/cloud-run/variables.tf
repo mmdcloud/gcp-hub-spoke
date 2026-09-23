@@ -190,102 +190,102 @@
 #   default = null
 # }
 
-# variable "containers" {
-#   description = "List of containers to deploy in the job/service revision."
-#   type = list(object({
-#     name           = optional(string)
-#     image          = string
-#     args           = optional(list(string))
-#     command        = optional(list(string))
-#     working_dir    = optional(string)
-#     base_image_uri = optional(string) # SERVICE only
+variable "containers" {
+  description = "List of containers to deploy in the job/service revision."
+  type = list(object({
+    name           = optional(string)
+    image          = string
+    args           = optional(list(string))
+    command        = optional(list(string))
+    working_dir    = optional(string)
+    base_image_uri = optional(string) # SERVICE only
 
-#     # JOB uses resources.limits; SERVICE uses resources.cpu_idle / startup_cpu_boost
-#     limits            = optional(map(string)) # JOB only
-#     cpu_idle          = optional(bool, true)  # SERVICE only
-#     startup_cpu_boost = optional(bool, false) # SERVICE only
+    # JOB uses resources.limits; SERVICE uses resources.cpu_idle / startup_cpu_boost
+    limits            = optional(map(string)) # JOB only
+    cpu_idle          = optional(bool, true)  # SERVICE only
+    startup_cpu_boost = optional(bool, false) # SERVICE only
 
-#     ports = optional(list(object({
-#       container_port = optional(number)
-#       name           = optional(string)
-#     })), [])
+    ports = optional(list(object({
+      container_port = optional(number)
+      name           = optional(string)
+    })), [])
 
-#     volume_mounts = optional(list(object({
-#       sub_path   = optional(string)
-#       name       = string
-#       mount_path = string
-#     })), [])
+    volume_mounts = optional(list(object({
+      sub_path   = optional(string)
+      name       = string
+      mount_path = string
+    })), [])
 
-#     env = optional(list(object({
-#       name  = string
-#       value = optional(string)
-#       value_source = optional(list(object({
-#         secret_key_ref = list(object({
-#           secret  = string
-#           version = string
-#         }))
-#       })), [])
-#     })), [])
+    env = optional(list(object({
+      name  = string
+      value = optional(string)
+      value_source = optional(list(object({
+        secret_key_ref = list(object({
+          secret  = string
+          version = string
+        }))
+      })), [])
+    })), [])
 
-#     # SERVICE only
-#     readiness_probe = optional(list(object({
-#       failure_threshold  = optional(number)
-#       period_seconds      = optional(number)
-#       success_threshold   = optional(number)
-#       timeout_seconds      = optional(number)
-#       grpc = optional(list(object({
-#         port    = optional(number)
-#         service = optional(string)
-#       })), [])
-#       http_get = optional(list(object({
-#         path = optional(string)
-#         port = optional(number)
-#       })), [])
-#     })), [])
+    # SERVICE only
+    readiness_probe = optional(list(object({
+      failure_threshold  = optional(number)
+      period_seconds      = optional(number)
+      success_threshold   = optional(number)
+      timeout_seconds      = optional(number)
+      grpc = optional(list(object({
+        port    = optional(number)
+        service = optional(string)
+      })), [])
+      http_get = optional(list(object({
+        path = optional(string)
+        port = optional(number)
+      })), [])
+    })), [])
 
-#     # SERVICE only
-#     liveness_probe = optional(list(object({
-#       failure_threshold     = optional(number)
-#       period_seconds         = optional(number)
-#       timeout_seconds         = optional(number)
-#       initial_delay_seconds   = optional(number)
-#       grpc = optional(list(object({
-#         port    = optional(number)
-#         service = optional(string)
-#       })), [])
-#       http_get = optional(list(object({
-#         path = optional(string)
-#         port = optional(number)
-#       })), [])
-#       tcp_socket = optional(list(object({
-#         port = optional(number)
-#       })), [])
-#     })), [])
+    # SERVICE only
+    liveness_probe = optional(list(object({
+      failure_threshold     = optional(number)
+      period_seconds         = optional(number)
+      timeout_seconds         = optional(number)
+      initial_delay_seconds   = optional(number)
+      grpc = optional(list(object({
+        port    = optional(number)
+        service = optional(string)
+      })), [])
+      http_get = optional(list(object({
+        path = optional(string)
+        port = optional(number)
+      })), [])
+      tcp_socket = optional(list(object({
+        port = optional(number)
+      })), [])
+    })), [])
 
-#     # JOB and SERVICE
-#     startup_probe = optional(list(object({
-#       failure_threshold      = optional(number)
-#       initial_delay_seconds   = optional(number)
-#       period_seconds          = optional(number)
-#       timeout_seconds          = optional(number)
-#       grpc = optional(list(object({
-#         port    = optional(number)
-#         service = optional(string)
-#       })), [])
-#       http_get = optional(list(object({
-#         path = optional(string)
-#         port = optional(number)
-#         http_headers = optional(list(object({
-#           name  = string
-#           value = optional(string)
-#         })), [])
-#       })), [])
-#       tcp_socket = optional(list(object({
-#         port = optional(number)
-#       })), [])
-#     })), [])
-#   }))
-# }
+    # JOB and SERVICE
+    startup_probe = optional(list(object({
+      failure_threshold      = optional(number)
+      initial_delay_seconds   = optional(number)
+      period_seconds          = optional(number)
+      timeout_seconds          = optional(number)
+      grpc = optional(list(object({
+        port    = optional(number)
+        service = optional(string)
+      })), [])
+      http_get = optional(list(object({
+        path = optional(string)
+        port = optional(number)
+        http_headers = optional(list(object({
+          name  = string
+          value = optional(string)
+        })), [])
+      })), [])
+      tcp_socket = optional(list(object({
+        port = optional(number)
+      })), [])
+    })), [])
+  }))
+}
 
 # variable "ingress" {
 #   description = "Ingress settings for the service (SERVICE only)."
@@ -693,10 +693,10 @@ variable "vpc_access" {
   default = null
 }
 
-variable "containers" {
-  description = "List of containers to run. See the google_cloud_run_v2_service/job/worker_pool docs for the full nested shape (ports, env, probes, volume_mounts, resources, etc)."
-  type        = any
-}
+# variable "containers" {
+#   description = "List of containers to run. See the google_cloud_run_v2_service/job/worker_pool docs for the full nested shape (ports, env, probes, volume_mounts, resources, etc)."
+#   type        = any
+# }
 
 # --- IAM ---------------------------------------------------------------
 
