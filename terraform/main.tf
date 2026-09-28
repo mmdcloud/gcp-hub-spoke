@@ -930,7 +930,7 @@ module "db" {
 #---------------------------------------------------------------
 # Hub-Spoke: all four VPCs attached as spokes to the same hub
 #---------------------------------------------------------------
-module "hub-spoke" {
+module "hub_spoke" {
   source          = "./modules/hub-spoke"
   hub_name        = var.hub_name
   hub_description = var.hub_description
@@ -967,9 +967,8 @@ module "hub-spoke" {
     {
       spoke_name = "cloudsql-spoke"
       location   = "global"
-      linked_producer_vpc_network = {
-        network = module.cloudsql_vpc.self_link
-        peering = module.db.service_peering
+      linked_vpc_network = {
+        uri = module.cloudsql_vpc.self_link
       }
     },
     {
@@ -985,4 +984,18 @@ module "hub-spoke" {
       }
     }
   ]
+}
+
+# Only for linked_producer_vpc_network becaue it needs an explicit dependency on parent vpc network
+resource "google_network_connectivity_spoke" "cloudsql_producer" {
+  name     = "cloudsql-producer-spoke"
+  location = "global"
+  hub      = module.hub_spoke.hub_id
+
+  linked_producer_vpc_network {
+    network = module.cloudsql_vpc.self_link
+    peering = module.db.service_peering
+  }
+
+  depends_on = [module.hub_spoke, module.db]
 }

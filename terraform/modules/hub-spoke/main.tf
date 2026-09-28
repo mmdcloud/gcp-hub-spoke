@@ -24,15 +24,15 @@ resource "google_network_connectivity_spoke" "spokes" {
     }
   }
 
-  dynamic "linked_producer_vpc_network" {
-    for_each = each.value.linked_producer_vpc_network != null ? [each.value.linked_producer_vpc_network] : []
-    content {
-      network               = linked_producer_vpc_network.value.network
-      peering               = linked_producer_vpc_network.value.peering
-      exclude_export_ranges = try(linked_producer_vpc_network.value.exclude_export_ranges, null)
-      include_export_ranges = try(linked_producer_vpc_network.value.include_export_ranges, null)
-    }
-  }
+  # dynamic "linked_producer_vpc_network" {
+  #   for_each = each.value.linked_producer_vpc_network != null ? [each.value.linked_producer_vpc_network] : []
+  #   content {
+  #     network               = linked_producer_vpc_network.value.network
+  #     peering               = linked_producer_vpc_network.value.peering
+  #     exclude_export_ranges = try(linked_producer_vpc_network.value.exclude_export_ranges, null)
+  #     include_export_ranges = try(linked_producer_vpc_network.value.include_export_ranges, null)
+  #   }
+  # }
 
   dynamic "linked_vpn_tunnels" {
     for_each = each.value.linked_vpn_tunnels != null ? [each.value.linked_vpn_tunnels] : []
